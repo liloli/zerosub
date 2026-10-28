@@ -1,6 +1,7 @@
+import { execFile } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { readdir } from "node:fs/promises";
-import { join } from "node:path";
+import { readdir, readFile } from "node:fs/promises";
+import { isAbsolute, join } from "node:path";
 import type {
   PluginHookContext,
   PluginLifecycleEvents,
@@ -32,13 +33,13 @@ import {
 } from "./adapter";
 import { FamilyResolver } from "./families";
 import { CodexContinuations } from "./continuations";
-import { CONTINUED_FROM_LABEL, continueInNewAgent, type Continuation } from "./handoff";
+import { buildTranscript, continuationPrompt, CONTINUED_FROM_LABEL, continueInNewAgent, type Continuation } from "./handoff";
 import { removeHome } from "./homes";
 import { Mutex } from "./json-file";
 import { turnRows } from "./limits";
 import { canSignInWithBrowser } from "./machine";
 import { equivalentMode } from "./modes";
-import { homesDir } from "./paths";
+import { dataDir, homesDir } from "./paths";
 import { Reopener } from "./reopen";
 import { SwitchGuard } from "./switch-guard";
 import { loadReadings, mergeUsage, saveReadings, showLimit } from "./usage";
@@ -60,6 +61,31 @@ type TurnEnded = PluginLifecycleEvents["agent.turn_ended"];
 
 const FAMILIES: readonly Family[] = ["claude", "codex"];
 const PROVIDER_NAME: Record<Family, string> = { claude: "Claude Code", codex: "Codex" };
+
+interface CommanderHandover { command: string; models: Record<Family, string>; titlePrefix: string }
+
+/**
+ * Sessions labelled `wf-role=commander` or `wf-role=control` keep their account and hand over to a new
+ * session through an external command set in `commander-handover.json` in ZeroSub's data directory:
+ * `{ "command": "/absolute/path", "models": { "claude": "...", "codex": "..." }, "titlePrefix": "..." }`.
+ * Without that file every session takes the ordinary path.
+ */
+async function commanderHandover(agent: { labels?: Record<string, string> } | null | undefined): Promise<CommanderHandover | null> {
+  if (!["commander", "control"].includes(agent?.labels?.["wf-role"] ?? "")) return null;
+  let raw: string;
+  try {
+    raw = await readFile(join(dataDir(), "commander-handover.json"), "utf8");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw error;
+  }
+  const config = JSON.parse(raw);
+  if (typeof config?.command !== "string" || !isAbsolute(config.command)
+    || typeof config.models?.claude !== "string" || typeof config.models?.codex !== "string") {
+    throw new Error("commander-handover.json needs an absolute command and a model for claude and codex.");
+  }
+  return { command: config.command, models: config.models, titlePrefix: typeof config.titlePrefix === "string" ? config.titlePrefix : "" };
+}
 const OTHER_FAMILY: Record<Family, Family> = { claude: "codex", codex: "claude" };
 /** How often to read usage: accounts in use, the defaults, and the rest. Adapters space reads further. */
 const USAGE_BUSY_MS = 60_000;
@@ -381,7 +407,12 @@ export class Service {
     const adapter = this.adapters[family];
     const now = Date.now();
     const state = await this.store.read();
-    const decision = chooseAccount(state, {
+    const source = (await context.paseo.agents.ref(request.agentId).refresh())?.agent;
+    const commander = await commanderHandover(source);
+    const sourceAccount = commander ? state.sessions[request.agentId]?.accountId ?? state.bindings[request.agentId]?.accountId : undefined;
+    const pinned = findAccount(state, sourceAccount);
+    if (sourceAccount && !pinned) throw new Error("Commander source account is unavailable; continue in a new session.");
+    const decision = pinned ? { account: pinned, bind: null, skipped: null } : chooseAccount(state, {
       agentId: request.agentId,
       family,
       reason: request.reason,
@@ -718,7 +749,10 @@ export class Service {
       return;
     }
 
-    if (adapter.portable) {
+    const sourceAgent = (await paseo.agents.ref(agentId).refresh())?.agent;
+    if (!sourceAgent) throw new Error("The original agent is no longer available.");
+    const commander = await commanderHandover(sourceAgent);
+    if (adapter.portable && !commander) {
       await this.store.update((draft) => {
         draft.bindings[agentId] = { accountId: next.id, source: "auto", at: new Date(now).toISOString() };
       });
@@ -752,14 +786,17 @@ export class Service {
     }
     const why =
       reason === "limit"
-        ? `its ChatGPT account (${account.label}) reached its usage limit`
-        : `its ChatGPT account (${account.label}) was signed out`;
+        ? `its ${FAMILY_LABEL[family]} account (${account.label}) reached its usage limit`
+        : `its ${FAMILY_LABEL[family]} account (${account.label}) was signed out`;
     try {
       const continuation = await this.continueElsewhere(paseo, agentId, next, why, timeline, "auto");
+      const landed = await this.store.read();
+      const actual = findAccount(landed, landed.sessions[continuation.agentId]?.accountId ?? landed.bindings[continuation.agentId]?.accountId);
+      if (!actual) throw new Error("Successor account is unavailable; check the created agent before retrying.");
       this.switchGuard.note(agentId, now);
       await this.appendRow(paseo, agentId, {
         ...base,
-        to: next.label,
+        to: actual.label,
         reason,
         continued: true,
         continuedIn: continuation,
@@ -972,6 +1009,8 @@ export class Service {
       if (this.switching.has(agentId) || !this.switchGuard.allows(agentId, Date.now())) continue;
       const info = await agentInfo(paseo, agentId);
       if (!info || info.archived || info.status !== "idle") continue;
+      const original = (await paseo.agents.ref(agentId).refresh())?.agent;
+      if (await commanderHandover(original)) continue;
       if (await this.lastTurnHitLimit(paseo, agentId, family)) continue;
       this.switching.add(agentId);
       try {
@@ -1021,12 +1060,15 @@ export class Service {
     const name = FAMILY_LABEL[other];
     const families = await this.families.resolve(paseo);
     const state = await this.store.read();
+    const original = (await paseo.agents.ref(agentId).refresh())?.agent;
+    if (!original) throw new Error("That agent is no longer available.");
+    const commander = await commanderHandover(original);
     // Prompting the original again while it's still out mustn't start a second copy of the work.
     const earlier = (await listAgents(paseo, false)).agents.find(
       (agent) => agent.continuedFrom === agentId && families[agent.provider] === other,
     );
     const earlierAccount = earlier && (findAccount(state, state.bindings[earlier.id]?.accountId) ?? mainAccount(state, other));
-    if (earlier && earlierAccount) {
+    if (!commander && earlier && earlierAccount) {
       return { fork: { agentId: earlier.id, title: earlier.title ?? `${name} agent` }, account: earlierAccount, family: other };
     }
 
@@ -1039,8 +1081,6 @@ export class Service {
     const account = mostAvailable(state, other, (id) => this.usage.get(id), Date.now(), new Set());
     if (!account) return { skipped: `Every ${name} account is at its limit too.` };
 
-    const original = (await paseo.agents.ref(agentId).refresh())?.agent;
-    if (!original) throw new Error("That agent is no longer available.");
     const [sourceModes, targetModes] = await Promise.all([
       paseo.providers.listModes(original.provider).then((result) => result.modes ?? []),
       paseo.providers.listModes(provider).then((result) => result.modes ?? []),
@@ -1051,6 +1091,15 @@ export class Service {
       return {
         skipped: `${name} has no mode as careful as this agent's${current ? ` (“${current}”)` : ""}, so ZeroSub didn't continue it there.`,
       };
+    }
+
+    if (commander) {
+      const fork = await this.continueCommander(paseo, agentId, other, modeId, timeline,
+        source === "auto" ? `every ${FAMILY_LABEL[family]} account reached its usage limit` : `the work was moved to ${name}`);
+      const landed = await this.store.read();
+      const actual = findAccount(landed, landed.sessions[fork.agentId]?.accountId ?? landed.bindings[fork.agentId]?.accountId);
+      if (!actual) throw new Error("Successor account is unavailable; check the created agent before retrying.");
+      return { fork, account: actual, family: actual.family };
     }
 
     const fork = await continueInNewAgent({
@@ -1126,6 +1175,12 @@ export class Service {
     timeline: readonly AgentTimelineItem[] | undefined,
     source: "auto" | "user",
   ): Promise<Continuation> {
+    const original = (await paseo.agents.ref(agentId).refresh())?.agent;
+    if (!original) throw new Error("That agent is no longer available.");
+    if (await commanderHandover(original)) {
+      if (!original.currentModeId) throw new Error("Cannot establish the commander's permission mode.");
+      return this.continueCommander(paseo, agentId, target.family, original.currentModeId, timeline, why, source === "user" ? target.id : undefined);
+    }
     if (target.family === "codex") return this.continuations.continue(paseo, agentId, target, why, source);
     return continueInNewAgent({
       paseo,
@@ -1142,6 +1197,34 @@ export class Service {
         });
       },
     });
+  }
+
+  /** Commanders bypass account-tab delivery: the handover command owns creation and the single prompt. */
+  private async continueCommander(paseo: PaseoApi, agentId: string, family: Family, mode: string,
+    timeline: readonly AgentTimelineItem[] | undefined, why: string, expectedAccount?: string): Promise<Continuation> {
+    const source = (await paseo.agents.ref(agentId).refresh())?.agent;
+    const handover = await commanderHandover(source);
+    if (!source || !handover) throw new Error("Commander identity changed.");
+    const items = timeline ?? (await paseo.agents.ref(agentId).timeline.refetch({ direction: "tail", limit: 500 })).entries.map(entry => entry.item);
+    const model = handover.models[family];
+    const title = `${handover.titlePrefix}${source.title?.trim() || "Task"}`;
+    const args = ["--no-wait", "--handover-from", agentId, "--provider", `${family}/${model}`, "--mode", mode,
+      ...(expectedAccount ? ["--expected-account", expectedAccount] : []),
+      "--title", title, ...(source.workspaceId ? ["--workspace", source.workspaceId] : ["--cwd", source.cwd]),
+      "--", continuationPrompt(buildTranscript(items), why, PROVIDER_NAME[(source.provider === "codex" ? "codex" : "claude")])];
+    const env = { ...process.env };
+    delete env.PASEO_AGENT_ID;
+    delete env.PASEO_AGENT_CWD;
+    const output = await new Promise<string>((resolve, reject) => {
+      execFile(handover.command, args,
+        { cwd: source.cwd, env, timeout: 180_000, maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
+          if (error) reject(new Error(`Commander handover not confirmed; check live agents before retrying: ${stderr.slice(-1000)}`));
+          else resolve(stdout);
+        });
+    });
+    const id = output.match(/"agentId":\s*"([^"]+)"/)?.[1];
+    if (!id) throw new Error("The handover command returned no verified successor ID; check live agents before retrying.");
+    return { agentId: id, title };
   }
 
   // ------------------------------------------------------------------ reopening sessions
@@ -1189,6 +1272,8 @@ export class Service {
     }
     // Reloading an archived agent would unarchive it; a closed one routes itself when it next opens.
     if (info.archived || info.status === "closed") return "closed";
+    const original = (await paseo.agents.ref(agentId).refresh())?.agent;
+    if (await commanderHandover(original)) return "closed";
     const family = (await this.families.resolve(paseo))[info.provider];
     if (family && !this.adapters[family].portable && info.hasHistory) {
       // The thread gained history while waiting, so it can no longer change accounts: keep it put.
@@ -1237,6 +1322,8 @@ export class Service {
       const agentId = agent.id;
       const family = families[agent.provider];
       if (!family || this.switching.has(agentId)) continue;
+      const original = (await paseo.agents.ref(agentId).refresh())?.agent;
+      if (await commanderHandover(original)) continue;
       const current = this.runningOn(state, agentId, family);
       const target = this.targetFor(state, agentId, family);
       if (!current || !target || target === current) continue;
@@ -1594,11 +1681,14 @@ export class Service {
     if (!target.signedIn) throw new Error(`${target.label} is signed out. Sign it in first.`);
     if (accountId && target.disabled) throw new Error(`${target.label} is disabled. Enable it in Accounts first.`);
 
-    if (!adapter.portable) {
+    const original = (await paseo.agents.ref(agentId).refresh())?.agent;
+    if (!original) throw new Error("The original agent is no longer available.");
+    const commander = await commanderHandover(original);
+    if (!adapter.portable || commander) {
       if (info.status === "running" || info.status === "initializing") {
         throw new Error("This agent is working right now. Wait for its turn to finish, then switch.");
       }
-      if (info.hasHistory) {
+      if (info.hasHistory || commander) {
         const binding = state.bindings[agentId];
         const current = binding?.source === "thread" ? binding.accountId : this.runningOn(state, agentId, family);
         if (current === target.id) return emptySummary();
@@ -1606,14 +1696,17 @@ export class Service {
           paseo,
           agentId,
           target,
-          `you moved the work to your ChatGPT account "${target.label}"`,
+          `you moved the work to your ${FAMILY_LABEL[family]} account "${target.label}"`,
           undefined,
           "user",
         ));
+        const landed = await this.store.read();
+        const actual = findAccount(landed, landed.sessions[continuation.agentId]?.accountId ?? landed.bindings[continuation.agentId]?.accountId);
+        if (!actual) throw new Error("Successor account is unavailable; check the created agent before retrying.");
         await this.appendRow(paseo, agentId, {
           family,
           from: findAccount(state, current)?.label ?? null,
-          to: target.label,
+          to: actual.label,
           reason: "manual",
           resetsAt: null,
           continued: true,
