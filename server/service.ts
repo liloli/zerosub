@@ -163,6 +163,7 @@ function emptySummary(): ReopenSummary {
 export class Service {
   private readonly continuations: CodexContinuations;
   private paseo: PaseoApi | null = null;
+  private programPoll: Promise<void> | null = null;
   private prefs: Preferences = DEFAULT_PREFERENCES;
   private readonly usage = new Map<string, Usage>();
   private readonly usageAttemptAt = new Map<string, number>();
@@ -281,7 +282,27 @@ export class Service {
       if (login.finishedAt && now - login.finishedAt > LOGIN_TTL_MS) this.logins.delete(id);
       else if (!login.finishedAt && now - Date.parse(login.view.startedAt) > LOGIN_TTL_MS) void this.cancelLogin(id);
     }
+    void this.pollProgramHandover();
     if (this.paseo) await this.collectOrphanHomes(this.paseo);
+  }
+
+  private pollProgramHandover(): Promise<void> {
+    if (this.stopped) return Promise.resolve();
+    if (this.programPoll) return this.programPoll;
+    this.programPoll = (async () => {
+      let raw: string;
+      try { raw = await readFile(join(dataDir(), "commander-handover.json"), "utf8"); }
+      catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return; throw error; }
+      const command = JSON.parse(raw).programCommand;
+      if (command === undefined) return;
+      if (typeof command !== "string" || !isAbsolute(command)) throw new Error("programCommand must be absolute");
+      const env = { ...process.env };
+      delete env.PASEO_AGENT_ID;
+      delete env.PASEO_AGENT_CWD;
+      await new Promise<void>((resolve, reject) => execFile(command, ["--poll"],
+        { env, timeout: 180_000, maxBuffer: 1024 * 1024 }, error => error ? reject(error) : resolve()));
+    })().catch(error => log("program handover poll failed", error)).finally(() => { this.programPoll = null; });
+    return this.programPoll;
   }
 
   private async refreshIdentity(accountId: string): Promise<void> {
@@ -463,6 +484,7 @@ export class Service {
 
   async onTurnEnded(event: TurnEnded, context: PluginHookContext): Promise<void> {
     this.attach(context.paseo);
+    void this.pollProgramHandover();
     const family = (await this.families.resolve(context.paseo))[event.agent.provider];
     if (!family) return;
     const adapter = this.adapters[family];
