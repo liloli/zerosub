@@ -22,10 +22,15 @@ export const preferences = defineSettings({
      * open at the time. Codex threads never move either way.
      */
     moveAgentsOnDefaultChange: z.boolean().default(true),
-    /** New agents start on the account with the most headroom instead of the default. */
+    /** New agents choose an account by usage instead of the default. */
     balanceNewAgents: z.boolean().default(false),
     /** When every account of a provider is at its limit, spend a banked reset instead of stopping. */
     autoRedeem: z.boolean().default(false),
+    /**
+     * A ChatGPT account at its limit stays in use while it has ChatGPT credits, so new agents may
+     * spend paid credits even while another account still has room. A limit a turn ran into stands.
+     */
+    useCredits: z.boolean().default(false),
     /**
      * When every account of a provider is at its limit, carry the chat on in a new agent on the
      * other provider (Claude ↔ ChatGPT), in a mode no more permissive than the original's.

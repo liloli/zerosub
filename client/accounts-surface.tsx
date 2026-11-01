@@ -3,7 +3,7 @@ import { Icon, Modal, TextInput, useToast } from "@getpaseo/plugin/client/react-
 import { SettingsCard, SettingsSwitch } from "@getpaseo/plugin/client/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ScrollView, Text, View } from "react-native";
-import { accountSubtitle, formatAge, formatPlan, usageSummary } from "../shared/format";
+import { accountSubtitle, formatAge, formatCredits, formatPlan, usageSummary } from "../shared/format";
 import { FAMILY_LABEL, type AccountView, type AntigravityView, type Family } from "../shared/model";
 import { preferences } from "../shared/preferences";
 import {
@@ -247,6 +247,7 @@ function AccountCard({
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const resets = account.usage?.resets ?? null;
+  const credits = account.usage?.credits ?? null;
   const plan = formatPlan(account.plan);
   const summary = usageSummary(account);
   const subtitle = accountSubtitle(account);
@@ -403,6 +404,7 @@ function AccountCard({
         ) : (
           <Text style={text.small}>{account.usage?.error ?? summary ?? "Checking usage…"}</Text>
         )}
+        {!signedOut && credits ? <Text style={text.small}>{formatCredits(credits)}</Text> : null}
         {!signedOut && windows.length > 0 && account.usage?.error ? <Text style={text.small}>{account.usage.error}</Text> : null}
         {!signedOut && resets?.blockedReason ? <Text style={text.small}>{resets.blockedReason}</Text> : null}
       </View>
@@ -664,7 +666,7 @@ function AutomationSettings({ theme }: { theme: Theme }) {
         />
         <SettingsSwitch
           label="Spread new agents across accounts"
-          hint="New agents start on the account with the most room instead of the default."
+          hint="New ChatGPT agents prefer a weekly reset within one day when both limits have at least 20% left. Otherwise, new agents use the account with the most room."
           value={settings.values.balanceNewAgents}
           disabled={settings.saving}
           onValueChange={(balanceNewAgents) => save({ balanceNewAgents })}
@@ -682,6 +684,13 @@ function AutomationSettings({ theme }: { theme: Theme }) {
           value={settings.values.autoRedeem}
           disabled={settings.saving || !settings.values.autoSwitch}
           onValueChange={(autoRedeem) => save({ autoRedeem })}
+        />
+        <SettingsSwitch
+          label="Use ChatGPT credits when a limit is reached"
+          hint="A ChatGPT account at its limit stays in use while it has credits, so new agents may spend paid credits even while another account still has room."
+          value={settings.values.useCredits}
+          disabled={settings.saving}
+          onValueChange={(useCredits) => save({ useCredits })}
         />
         <SettingsSwitch
           label="When every account is out, fork the chat to the other provider"
