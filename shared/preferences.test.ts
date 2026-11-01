@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { DEFAULT_CONTINUE_PROMPT, preferences } from "./preferences";
+import { DEFAULT_CARD_COLORS, DEFAULT_CONTINUE_PROMPT, preferences } from "./preferences";
 
 // The preferences 1.2.1 and 1.2.2 shipped, before "Move open agents when the default changes".
 const shipped = z.object({
@@ -31,5 +31,35 @@ describe("preferences", () => {
     expect(shipped.safeParse(saved)).toMatchObject({ success: true, data: { autoSwitch: false } });
     // Paseo won't load preferences saved under a newer version number, so a new switch mustn't bump it.
     expect(preferences.version).toBe(1);
+  });
+});
+
+
+describe("card colors", () => {
+  it("fills defaults for saved preferences from before card colors existed", () => {
+    expect(preferences.schema.parse(shipped.parse({})).cardColors).toEqual(DEFAULT_CARD_COLORS);
+  });
+
+  it("round-trips custom card colors and intensity without changing other settings", () => {
+    const custom = { codex: "#aabbcc", claude: "#123456", antigravity: "#FEDCBA", opencodeGo: "#654321", opacity: 0.3 };
+    const saved = preferences.schema.parse({ autoSwitch: false, cardColors: custom });
+    expect(preferences.schema.parse(JSON.parse(JSON.stringify(saved)))).toMatchObject({ autoSwitch: false, cardColors: custom });
+    expect(preferences.schema.parse({ cardColors: { opacity: 0 } }).cardColors.opacity).toBe(0);
+  });
+
+  it("rejects invalid colors and out-of-range intensity", () => {
+    for (const codex of ["red", "#abc", "#12345g", "#12345678", ""]) {
+      expect(preferences.schema.safeParse({ cardColors: { codex } }).success).toBe(false);
+    }
+    for (const opacity of [-0.01, 0.31, NaN, Infinity, "0.12"]) {
+      expect(preferences.schema.safeParse({ cardColors: { opacity } }).success).toBe(false);
+    }
+  });
+
+  it("resets only card colors while preserving automation preferences", () => {
+    const saved = preferences.schema.parse({ autoSwitch: false, cardColors: { codex: "#112233", opacity: 0.25 } });
+    const reset = preferences.schema.parse({ ...saved, cardColors: { ...DEFAULT_CARD_COLORS } });
+    expect(reset.cardColors).toEqual(DEFAULT_CARD_COLORS);
+    expect(reset.autoSwitch).toBe(false);
   });
 });

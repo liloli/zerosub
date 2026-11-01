@@ -8,6 +8,7 @@ import {
 } from "@getpaseo/plugin/client/ui";
 import { useState } from "react";
 import { Text } from "react-native";
+import { CardColorsSection } from "./card-colors";
 import { DEFAULT_CONTINUE_PROMPT, preferences, type Preferences } from "../shared/preferences";
 
 /** Settings → Plugins → zerosub. Accounts themselves live in the sidebar surface. */
@@ -129,6 +130,7 @@ export function PreferencesScreen({ theme, host, onOpenAccounts }: PluginSurface
           />
         </SettingsCard>
       </SettingsSection>
+      <CardColorsSection theme={theme} />
     </>
   );
 }

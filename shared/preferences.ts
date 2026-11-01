@@ -5,6 +5,24 @@ import { z } from "zod";
 export const DEFAULT_CONTINUE_PROMPT =
   "You were interrupted by a usage limit; that has been sorted out. Continue exactly where you left off.";
 
+export const DEFAULT_CARD_COLORS = {
+  codex: "#10A37F",
+  claude: "#D97757",
+  antigravity: "#4285F4",
+  opencodeGo: "#8B5CF6",
+  opacity: 0.12,
+};
+
+const hexColor = z.string().trim().regex(/^#[0-9a-fA-F]{6}$/, "Use a six-digit hex color, such as #10A37F");
+export const CardColorsSchema = z.object({
+  codex: hexColor.default(DEFAULT_CARD_COLORS.codex),
+  claude: hexColor.default(DEFAULT_CARD_COLORS.claude),
+  antigravity: hexColor.default(DEFAULT_CARD_COLORS.antigravity),
+  opencodeGo: hexColor.default(DEFAULT_CARD_COLORS.opencodeGo),
+  opacity: z.number().min(0).max(0.3).default(DEFAULT_CARD_COLORS.opacity),
+});
+export type CardColors = z.output<typeof CardColorsSchema>;
+
 export const preferences = defineSettings({
   id: "preferences",
   scope: "host",
@@ -36,6 +54,7 @@ export const preferences = defineSettings({
      * other provider (Claude ↔ ChatGPT), in a mode no more permissive than the original's.
      */
     forkOtherProvider: z.boolean().default(false),
+    cardColors: CardColorsSchema.default(DEFAULT_CARD_COLORS),
     /** Show the account pill in the composer of Claude and Codex agents. */
     showComposerPill: z.boolean().default(true),
   }),

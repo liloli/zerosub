@@ -4,8 +4,7 @@ import { formatAge } from "../shared/format";
 import type { OpenCodeGoView } from "../shared/model";
 import { Card, UsageBar, useText } from "./ui";
 
-export const OPENCODE_GO_TINT = "#8B5CF6";
-export const PLATFORM_TINT_OPACITY = 0.12;
+import { useCardColors } from "./card-colors";
 
 export function OpenCodeGoCard({
   theme,
@@ -16,6 +15,7 @@ export function OpenCodeGoCard({
   usage: OpenCodeGoView;
   compact?: boolean;
 }) {
+  const colors = useCardColors();
   const text = useText(theme);
   if (usage.status === "unavailable") return null;
   const stale = usage.status === "stale" || usage.status === "error";
@@ -69,8 +69,8 @@ export function OpenCodeGoCard({
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: OPENCODE_GO_TINT,
-            opacity: PLATFORM_TINT_OPACITY,
+            backgroundColor: colors.opencodeGo,
+            opacity: colors.opacity,
           }}
         />
         {content}

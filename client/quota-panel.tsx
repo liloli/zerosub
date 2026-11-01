@@ -2,27 +2,28 @@ import type { PluginWorkspacePanelProps } from "@getpaseo/plugin/client";
 import { ScrollView, Text, View } from "react-native";
 import { formatAge, formatCredits, usageSummary } from "../shared/format";
 import { FAMILY_LABEL, type AccountView, type AntigravityView, type Family } from "../shared/model";
+import { DEFAULT_CARD_COLORS, type CardColors } from "../shared/preferences";
 import { useStore, type ZeroSubStore } from "./store";
 import { Badge, RemainingBar, UsageBar, useText } from "./ui";
-import { OPENCODE_GO_TINT, OpenCodeGoCard, PLATFORM_TINT_OPACITY } from "./opencode-go-card";
-
-export { PLATFORM_TINT_OPACITY };
+import { OpenCodeGoCard } from "./opencode-go-card";
+import { useCardColors } from "./card-colors";
 
 type Theme = PluginWorkspacePanelProps["theme"];
 
 export function platformTint(
   platform: Family | "antigravity" | "opencodeGo" | string,
   theme?: Theme,
+  colors: CardColors = DEFAULT_CARD_COLORS,
 ): string {
   switch (platform) {
     case "codex":
-      return "#10A37F";
+      return colors.codex;
     case "claude":
-      return "#D97757";
+      return colors.claude;
     case "antigravity":
-      return "#4285F4";
+      return colors.antigravity;
     case "opencodeGo":
-      return OPENCODE_GO_TINT;
+      return colors.opencodeGo;
     default:
       return theme?.colors.accent ?? "#4285F4";
   }
@@ -90,6 +91,7 @@ function AccountRow({
   theme: Theme;
   compact: boolean;
 }) {
+  const colors = useCardColors();
   const text = useText(theme);
   const signedOut = account.status === "signed_out";
   const disabled = account.status === "disabled";
@@ -118,8 +120,8 @@ function AccountRow({
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: platformTint(account.family, theme),
-          opacity: PLATFORM_TINT_OPACITY,
+          backgroundColor: platformTint(account.family, theme, colors),
+          opacity: colors.opacity,
         }}
       />
       <View
@@ -165,6 +167,7 @@ function AntigravitySection({
   theme: Theme;
   compact: boolean;
 }) {
+  const colors = useCardColors();
   const text = useText(theme);
   const stale = usage.status === "stale" || usage.status === "error";
 
@@ -189,8 +192,8 @@ function AntigravitySection({
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: platformTint("antigravity", theme),
-          opacity: PLATFORM_TINT_OPACITY,
+          backgroundColor: platformTint("antigravity", theme, colors),
+          opacity: colors.opacity,
         }}
       />
       <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "baseline", justifyContent: "space-between", gap: 6 }}>
