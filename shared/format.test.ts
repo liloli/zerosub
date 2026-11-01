@@ -7,25 +7,25 @@ const NOW = Date.parse("2026-09-23T12:00:00Z");
 describe("formatResetIn", () => {
   it("renders Beijing time and countdown for same day and cross day", () => {
     // NOW is 2026-09-23T12:00:00Z -> Beijing time 2026-09-23 20:00:00
-    expect(formatResetIn("2026-09-23T12:45:00Z", NOW)).toBe("20:45 (45m)");
-    expect(formatResetIn("2026-09-23T14:00:00Z", NOW)).toBe("22:00 (2h)");
-    expect(formatResetIn("2026-09-23T14:10:00Z", NOW)).toBe("22:10 (2h 10m)");
-    expect(formatResetIn("2026-09-26T15:00:00Z", NOW)).toBe("09-26 23:00 (3d 3h)");
+    expect(formatResetIn("2026-09-23T12:45:00Z", NOW)).toBe("20:45  45m");
+    expect(formatResetIn("2026-09-23T14:00:00Z", NOW)).toBe("22:00  2h");
+    expect(formatResetIn("2026-09-23T14:10:00Z", NOW)).toBe("22:10  2h 10m");
+    expect(formatResetIn("2026-09-26T15:00:00Z", NOW)).toBe("09-26 23:00  3d 3h");
     expect(formatResetIn("2026-09-23T11:00:00Z", NOW)).toBe("now");
     expect(formatResetIn(null, NOW)).toBeNull();
     expect(formatResetIn("not a date", NOW)).toBeNull();
   });
 
   it("formats user brief examples (same day and cross day in Asia/Shanghai)", () => {
-    // Brief same-day example: "resets 21:40 (4h 26m)"
+    // Brief same-day example: "21:40  4h 26m"
     // now = 17:14 Beijing (09:14 UTC), reset = 21:40 Beijing (13:40 UTC)
     const now1 = Date.parse("2026-11-01T09:14:00Z");
-    expect(formatResetIn("2026-11-01T13:40:00Z", now1)).toBe("21:40 (4h 26m)");
+    expect(formatResetIn("2026-11-01T13:40:00Z", now1)).toBe("21:40  4h 26m");
 
-    // Brief cross-day example: "resets 11-02 08:00 (15h)"
+    // Brief cross-day example: "11-02 08:00  15h"
     // now = 17:00 Beijing on 11-01 (09:00 UTC), reset = 08:00 Beijing on 11-02 (00:00 UTC)
     const now2 = Date.parse("2026-11-01T09:00:00Z");
-    expect(formatResetIn("2026-11-02T00:00:00Z", now2)).toBe("11-02 08:00 (15h)");
+    expect(formatResetIn("2026-11-02T00:00:00Z", now2)).toBe("11-02 08:00  15h");
   });
 
   it("determines same day strictly by Beijing date, even when UTC date differs or coincides", () => {
@@ -33,7 +33,7 @@ describe("formatResetIn", () => {
     // and reset is 2026-11-01 17:00Z (UTC is same day 11-01, but Beijing is 2026-11-02 01:00)
     // This is cross-day in Beijing time!
     const nowBeijingNight = Date.parse("2026-11-01T15:00:00Z");
-    expect(formatResetIn("2026-11-01T17:00:00Z", nowBeijingNight)).toBe("11-02 01:00 (2h)");
+    expect(formatResetIn("2026-11-01T17:00:00Z", nowBeijingNight)).toBe("11-02 01:00  2h");
   });
 
   it("produces identical results regardless of system timezone (non-+8 independence)", () => {
@@ -42,8 +42,8 @@ describe("formatResetIn", () => {
       for (const tz of ["UTC", "America/New_York", "Europe/London", "Asia/Tokyo", "Pacific/Auckland"]) {
         process.env.TZ = tz;
         const now = Date.parse("2026-11-01T09:14:00Z");
-        expect(formatResetIn("2026-11-01T13:40:00Z", now)).toBe("21:40 (4h 26m)");
-        expect(formatResetIn("2026-11-02T00:00:00Z", now)).toBe("11-02 08:00 (14h 46m)");
+        expect(formatResetIn("2026-11-01T13:40:00Z", now)).toBe("21:40  4h 26m");
+        expect(formatResetIn("2026-11-02T00:00:00Z", now)).toBe("11-02 08:00  14h 46m");
       }
     } finally {
       process.env.TZ = originalTZ;
@@ -105,12 +105,12 @@ describe("account presentation", () => {
 
   it("summarises the busiest window", () => {
     expect(peakUsage(account.usage?.windows ?? [])?.id).toBe("seven_day");
-    expect(usageSummary(account, NOW)).toBe("72% of weekly used · resets 09-25 20:00 (2d)");
+    expect(usageSummary(account, NOW)).toBe("72% of weekly used · 09-25 20:00  2d");
   });
 
   it("puts a reached limit first", () => {
     expect(usageSummary({ ...account, status: "limited", limitedUntil: "2026-09-23T13:30:00Z" }, NOW)).toBe(
-      "Limit reached · resets 21:30 (1h 30m)",
+      "Limit reached · 21:30  1h 30m",
     );
   });
 

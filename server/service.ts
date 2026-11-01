@@ -19,7 +19,7 @@ import {
   type StateView,
   type Usage,
 } from "../shared/model";
-import { DEFAULT_CARD_COLORS, DEFAULT_CONTINUE_PROMPT, type Preferences } from "../shared/preferences";
+import { DEFAULT_CONTINUE_PROMPT, type Preferences } from "../shared/preferences";
 import type { RedeemResult, ReopenSummary } from "../shared/rpc";
 import { SWITCH_ROW_KIND, SWITCH_ROW_VERSION, type SwitchRow } from "../shared/timeline";
 import {
@@ -119,7 +119,6 @@ const ROUTING_WAIT_MS = 5_000;
 const TURN_READ_MS = 10_000;
 
 const DEFAULT_PREFERENCES: Preferences = {
-  cardColors: DEFAULT_CARD_COLORS,
   autoSwitch: true,
   autoContinue: true,
   continuePrompt: DEFAULT_CONTINUE_PROMPT,

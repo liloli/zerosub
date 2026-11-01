@@ -618,7 +618,7 @@ function AntigravityCard({ theme, usage }: { theme: Theme; usage: AntigravityVie
       <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "baseline", justifyContent: "space-between", gap: 6 }}>
         <Text style={text.heading} accessibilityRole="header">Antigravity</Text>
         <Text style={text.small}>
-          {usage.lastSuccessAt ? `Updated ${formatAge(usage.lastSuccessAt)}` : "Not loaded yet"}
+          {usage.lastSuccessAt ? formatAge(usage.lastSuccessAt) : "Not loaded yet"}
           {usage.refreshing ? " · Refreshing…" : ""}
         </Text>
       </View>

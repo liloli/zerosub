@@ -28,6 +28,7 @@ function hostPrimitive(name: string) {
 
 vi.mock("react-native", () => ({
   ActivityIndicator: hostPrimitive("ActivityIndicator"),
+  Image: hostPrimitive("Image"),
   Pressable: hostPrimitive("Pressable"),
   ScrollView: hostPrimitive("ScrollView"),
   Text: hostPrimitive("Text"),
@@ -83,7 +84,9 @@ function renderText(node: unknown): string {
   }
   if (typeof node === "object" && "hostType" in node && "props" in node) {
     const hostNode = node as { props: Record<string, unknown> };
-    return renderText(hostNode.props.children);
+    const label = typeof hostNode.props.accessibilityLabel === "string" ? hostNode.props.accessibilityLabel : "";
+    const childrenText = renderText(hostNode.props.children);
+    return childrenText || label;
   }
   return "";
 }
@@ -218,18 +221,18 @@ describe("explorer quota panel", () => {
     const output = renderText(createElement(panel.Component, props));
     expect(rpc).toHaveBeenCalledTimes(1);
     expect(output).toContain("work-claude");
-    expect(output).toContain("5-hour");
-    expect(output).toContain("66% · resets 22:00 (2h)");
-    expect(output).toContain("Weekly");
-    expect(output).toContain("28% · resets 11-03 20:00 (2d)");
+    expect(output).toContain("5h");
+    expect(output).toContain("66% · 22:00  2h");
+    expect(output).toContain("weekly");
+    expect(output).toContain("28% · 11-03 20:00  2d");
     expect(output).toContain("Antigravity");
     expect(output).toContain("Gemini Pro");
-    expect(output).toContain("80% · resets 11-02 00:00 (4h)");
+    expect(output).toContain("80% · 11-02 00:00  4h");
     expect(output.indexOf("OpenCode Go")).toBeGreaterThan(output.indexOf("Antigravity"));
-    expect(output).toContain("100% · resets 22:00 (2h)");
-    expect(output).toContain("60% · resets 11-03 20:00 (2d)");
+    expect(output).toContain("100% · 22:00  2h");
+    expect(output).toContain("60% · 11-03 20:00  2d");
     expect(output).toContain("Monthly");
-    expect(output).toContain("51% · resets 11-08 20:00 (7d)");
+    expect(output).toContain("51% · 11-08 20:00  7d");
 
     const { AccountsSurface } = await import("./accounts-surface");
     const { createZeroSubStore } = await import("./store");
@@ -238,7 +241,7 @@ describe("explorer quota panel", () => {
     const accountsProps = { ...props, store } as unknown as Parameters<typeof AccountsSurface>[0];
     const accountsOutput = renderText(createElement(AccountsSurface, accountsProps));
     expect(accountsOutput.indexOf("OpenCode Go")).toBeGreaterThan(accountsOutput.indexOf("Antigravity"));
-    expect(accountsOutput).toContain("51% · resets 11-08 20:00 (7d)");
+    expect(accountsOutput).toContain("51% · 11-08 20:00  7d");
     state.opencodeGo = { ...state.opencodeGo, status: "error", error: "OpenCode Go usage failed (HTTP 401)." };
     await store.refresh();
     expect(renderText(createElement(AccountsSurface, accountsProps))).toContain("OpenCode Go usage failed (HTTP 401).");
@@ -366,16 +369,13 @@ describe("explorer quota panel", () => {
     cleanup();
   });
 
-  it("assigns distinct vibrant brand tints to ChatGPT, Claude, Antigravity, and OpenCode Go", async () => {
-    const { platformTint } = await import("./quota-panel");
-    const { DEFAULT_CARD_COLORS } = await import("../shared/preferences");
+  it("uses platform icons for ChatGPT, Claude, Antigravity, and OpenCode Go", async () => {
+    const { PLATFORM_INFO } = await import("./platform-icon");
 
-    expect(platformTint("codex", THEME)).toBe("#10A37F");
-    expect(platformTint("claude", THEME)).toBe("#D97757");
-    expect(platformTint("antigravity", THEME)).toBe("#4285F4");
-    expect(platformTint("opencodeGo", THEME)).toBe(DEFAULT_CARD_COLORS.opencodeGo);
-    expect(DEFAULT_CARD_COLORS.opencodeGo).toBe("#8B5CF6");
-    expect(DEFAULT_CARD_COLORS.opacity).toBe(0.12);
+    expect(PLATFORM_INFO.codex.label).toBe("ChatGPT");
+    expect(PLATFORM_INFO.claude.label).toBe("Claude");
+    expect(PLATFORM_INFO.antigravity.label).toBe("Antigravity");
+    expect(PLATFORM_INFO.opencode.label).toBe("OpenCode Go");
   });
 
   describe("quota remaining unification and display hierarchy", () => {
@@ -428,13 +428,13 @@ describe("explorer quota panel", () => {
     it("parses reset strings into dateTime and countdown parts", async () => {
       const { parseResetText } = await import("./ui");
 
-      expect(parseResetText("21:40 (4h 26m)")).toEqual({
+      expect(parseResetText("21:40  4h 26m")).toEqual({
         dateTime: "21:40",
-        countdown: "(4h 26m)",
+        countdown: "4h 26m",
       });
-      expect(parseResetText("11-04 17:24 (3d)")).toEqual({
+      expect(parseResetText("11-04 17:24  3d")).toEqual({
         dateTime: "11-04 17:24",
-        countdown: "(3d)",
+        countdown: "3d",
       });
       expect(parseResetText("now")).toEqual({
         dateTime: "now",
@@ -450,7 +450,8 @@ describe("explorer quota panel", () => {
         limit: { id: "5h", label: "5-hour", usedPercent: 34, resetsAt: "2026-11-01T14:00:00Z" },
       });
       const normalText = renderText(normalBar);
-      expect(normalText).toContain("66% · resets 22:00 (2h)");
+      expect(normalText).toContain("66% · 22:00  2h");
+      expect(normalText).not.toContain("resets");
       expect(normalText).not.toContain("used");
       expect(normalText).not.toContain("left");
 
@@ -471,7 +472,8 @@ describe("explorer quota panel", () => {
         bucket: { id: "gemini", label: "Gemini", window: "daily", remainingPercent: 80, resetsAt: "2026-11-01T16:00:00Z" },
       });
       const normalRemText = renderText(normalRemBar);
-      expect(normalRemText).toContain("80% · resets 11-02 00:00 (4h)");
+      expect(normalRemText).toContain("80% · 11-02 00:00  4h");
+      expect(normalRemText).not.toContain("resets");
       expect(normalRemText).not.toContain("left");
       expect(normalRemText).not.toContain("used");
 

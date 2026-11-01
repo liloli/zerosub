@@ -2,9 +2,9 @@ import type { PluginWorkspacePanelProps } from "@getpaseo/plugin/client";
 import { Text, View } from "react-native";
 import { formatAge } from "../shared/format";
 import type { OpenCodeGoView } from "../shared/model";
+import { PlatformIcon } from "./platform-icon";
+import { orderUsageWindows } from "./quota-display";
 import { Card, UsageBar, useText } from "./ui";
-
-import { useCardColors } from "./card-colors";
 
 export function OpenCodeGoCard({
   theme,
@@ -15,7 +15,6 @@ export function OpenCodeGoCard({
   usage: OpenCodeGoView;
   compact?: boolean;
 }) {
-  const colors = useCardColors();
   const text = useText(theme);
   if (usage.status === "unavailable") return null;
   const stale = usage.status === "stale" || usage.status === "error";
@@ -23,15 +22,10 @@ export function OpenCodeGoCard({
   const isPanel = compact !== undefined;
 
   const header = (
-    <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "baseline", justifyContent: "space-between", gap: 6 }}>
-      <Text
-        style={isPanel ? text.strong : text.heading}
-        accessibilityRole={isPanel ? undefined : "header"}
-      >
-        OpenCode Go
-      </Text>
+    <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
+      <PlatformIcon platform="opencode" />
       <Text style={text.small}>
-        {usage.lastSuccessAt ? `Updated ${formatAge(usage.lastSuccessAt)}` : "Not loaded yet"}
+        {usage.lastSuccessAt ? formatAge(usage.lastSuccessAt) : "Not loaded yet"}
         {usage.refreshing ? " · Refreshing…" : ""}
       </Text>
     </View>
@@ -41,7 +35,7 @@ export function OpenCodeGoCard({
     <>
       {header}
       <View style={{ gap: isPanel ? (compact ? 8 : 10) : 8, opacity: stale ? 0.55 : 1 }}>
-        {usage.windows.map((limit) => <UsageBar key={limit.id} theme={theme} limit={limit} />)}
+        {orderUsageWindows(usage.windows).map((limit) => <UsageBar key={limit.id} theme={theme} limit={limit} />)}
       </View>
       {stale && usage.error ? <Text style={text.warning}>{usage.error}</Text> : null}
     </>
@@ -51,28 +45,14 @@ export function OpenCodeGoCard({
     return (
       <View
         style={{
-          position: "relative",
           padding: compact ? 10 : 12,
           gap: compact ? 6 : 8,
           borderRadius: 10,
           borderWidth: 1,
           borderColor: theme.colors.border,
-          backgroundColor: theme.colors.surface0,
-          overflow: "hidden",
+          backgroundColor: theme.colors.surface1,
         }}
       >
-        <View
-          pointerEvents="none"
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: colors.opencodeGo,
-            opacity: colors.opacity,
-          }}
-        />
         {content}
       </View>
     );

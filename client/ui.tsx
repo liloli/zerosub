@@ -257,9 +257,9 @@ export function Badge({
 }
 
 export function parseResetText(resetText: string): { dateTime: string; countdown?: string } {
-  const match = resetText.match(/^(.*?)(?:\s+(\(.*\)))?$/);
-  if (match && match[1] && match[2]) {
-    return { dateTime: match[1], countdown: match[2] };
+  const parts = resetText.split("  ");
+  if (parts.length >= 2 && parts[0] !== undefined) {
+    return { dateTime: parts[0], countdown: parts.slice(1).join("  ") };
   }
   return { dateTime: resetText };
 }
@@ -315,10 +315,10 @@ export function QuotaBar({
           </Text>
           {parsedReset ? (
             <>
-              {" · resets "}
+              {" · "}
               <Text style={{ color: colors.foreground }}>{parsedReset.dateTime}</Text>
               {parsedReset.countdown ? (
-                <Text style={{ color: colors.foregroundMuted, opacity: 0.6 }}> {parsedReset.countdown}</Text>
+                <Text style={{ color: colors.foregroundMuted, opacity: 0.6 }}>  {parsedReset.countdown}</Text>
               ) : null}
             </>
           ) : null}

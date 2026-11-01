@@ -16,8 +16,8 @@ function formatCountdown(minutes: number): string {
 
 /**
  * Reset time in Beijing time (Asia/Shanghai, UTC+8) plus countdown:
- * - Same day (Beijing date): "21:40 (4h 26m)"
- * - Other day: "11-02 08:00 (15h)"
+ * - Same day (Beijing date): "21:40  4h 26m"
+ * - Other day: "11-02 08:00  15h"
  * - Expired / now: "now"
  */
 export function formatResetIn(resetsAt: string | null, now: number = Date.now()): string | null {
@@ -41,12 +41,12 @@ export function formatResetIn(resetsAt: string | null, now: number = Date.now())
   const timeStr = `${hours}:${mins}`;
 
   if (isSameDay) {
-    return `${timeStr} (${countdown})`;
+    return `${timeStr}  ${countdown}`;
   }
 
   const month = String(beijingAt.getUTCMonth() + 1).padStart(2, "0");
   const day = String(beijingAt.getUTCDate()).padStart(2, "0");
-  return `${month}-${day} ${timeStr} (${countdown})`;
+  return `${month}-${day} ${timeStr}  ${countdown}`;
 }
 
 export function formatPercent(value: number): string {
@@ -131,11 +131,11 @@ export function usageSummary(account: AccountView, now: number = Date.now()): st
   if (account.status === "disabled") return "Disabled for now";
   if (account.status === "limited") {
     const reset = formatResetIn(account.limitedUntil, now);
-    return reset ? `Limit reached · resets ${reset}` : "Limit reached";
+    return reset ? `Limit reached · ${reset}` : "Limit reached";
   }
   const peak = account.usage ? peakUsage(account.usage.windows) : null;
   if (!peak) return null;
   const reset = formatResetIn(peak.resetsAt, now);
   const base = `${formatPercent(peak.usedPercent)} of ${peak.label.toLowerCase()} used`;
-  return reset ? `${base} · resets ${reset}` : base;
+  return reset ? `${base} · ${reset}` : base;
 }

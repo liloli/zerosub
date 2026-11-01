@@ -1,33 +1,14 @@
 import type { PluginWorkspacePanelProps } from "@getpaseo/plugin/client";
 import { ScrollView, Text, View } from "react-native";
 import { formatAge, formatCredits, usageSummary } from "../shared/format";
-import { FAMILY_LABEL, type AccountView, type AntigravityView, type Family } from "../shared/model";
-import { DEFAULT_CARD_COLORS, type CardColors } from "../shared/preferences";
+import type { AccountView, AntigravityView, Family } from "../shared/model";
+import { OpenCodeGoCard } from "./opencode-go-card";
+import { PlatformIcon } from "./platform-icon";
+import { displayGroupName, orderAntigravityBuckets, orderUsageWindows } from "./quota-display";
 import { useStore, type ZeroSubStore } from "./store";
 import { Badge, RemainingBar, UsageBar, useText } from "./ui";
-import { OpenCodeGoCard } from "./opencode-go-card";
-import { useCardColors } from "./card-colors";
 
 type Theme = PluginWorkspacePanelProps["theme"];
-
-export function platformTint(
-  platform: Family | "antigravity" | "opencodeGo" | string,
-  theme?: Theme,
-  colors: CardColors = DEFAULT_CARD_COLORS,
-): string {
-  switch (platform) {
-    case "codex":
-      return colors.codex;
-    case "claude":
-      return colors.claude;
-    case "antigravity":
-      return colors.antigravity;
-    case "opencodeGo":
-      return colors.opencodeGo;
-    default:
-      return theme?.colors.accent ?? "#4285F4";
-  }
-}
 
 const FAMILIES: readonly Family[] = ["codex", "claude"];
 
@@ -91,7 +72,6 @@ function AccountRow({
   theme: Theme;
   compact: boolean;
 }) {
-  const colors = useCardColors();
   const text = useText(theme);
   const signedOut = account.status === "signed_out";
   const disabled = account.status === "disabled";
@@ -102,41 +82,32 @@ function AccountRow({
   return (
     <View
       style={{
-        position: "relative",
         padding: compact ? 10 : 12,
         gap: compact ? 6 : 8,
         borderRadius: 10,
         borderWidth: 1,
         borderColor: theme.colors.border,
-        backgroundColor: theme.colors.surface0,
-        overflow: "hidden",
+        backgroundColor: theme.colors.surface1,
       }}
     >
-      <View
-        pointerEvents="none"
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: platformTint(account.family, theme, colors),
-          opacity: colors.opacity,
-        }}
-      />
       <View
         style={[
           { flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 6 },
           faded,
         ]}
       >
-        <View style={{ flexDirection: "row", alignItems: "baseline", gap: 6, flexShrink: 1, minWidth: 0 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexShrink: 1, minWidth: 0 }}>
+          <PlatformIcon platform={account.family} />
           <Text style={[text.strong, { flexShrink: 1 }]} numberOfLines={1}>
             {account.label}
           </Text>
-          <Text style={text.small}>{FAMILY_LABEL[account.family]}</Text>
         </View>
-        <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 4 }}>
+        <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 6 }}>
+          {account.usage?.fetchedAt ? (
+            <Text style={text.small}>{formatAge(account.usage.fetchedAt)}</Text>
+          ) : !signedOut ? (
+            <Text style={text.small}>Not loaded yet</Text>
+          ) : null}
           {account.isDefault ? <Badge theme={theme} label="Default" tone="accent" /> : null}
           {account.status === "limited" ? <Badge theme={theme} label="Limit reached" tone="danger" /> : null}
           {disabled ? <Badge theme={theme} label="Disabled" /> : null}
@@ -148,7 +119,7 @@ function AccountRow({
         {signedOut ? (
           <Text style={text.small}>Sign in again to use this account.</Text>
         ) : limits.length > 0 ? (
-          limits.map((limit) => <UsageBar key={limit.id} theme={theme} limit={limit} />)
+          orderUsageWindows(limits).map((limit) => <UsageBar key={limit.id} theme={theme} limit={limit} />)
         ) : (
           <Text style={text.small}>{account.usage?.error ?? usageSummary(account) ?? "Checking usage…"}</Text>
         )}
@@ -167,47 +138,32 @@ function AntigravitySection({
   theme: Theme;
   compact: boolean;
 }) {
-  const colors = useCardColors();
   const text = useText(theme);
   const stale = usage.status === "stale" || usage.status === "error";
 
   return (
     <View
       style={{
-        position: "relative",
         padding: compact ? 10 : 12,
         gap: compact ? 6 : 8,
         borderRadius: 10,
         borderWidth: 1,
         borderColor: theme.colors.border,
-        backgroundColor: theme.colors.surface0,
-        overflow: "hidden",
+        backgroundColor: theme.colors.surface1,
       }}
     >
-      <View
-        pointerEvents="none"
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: platformTint("antigravity", theme, colors),
-          opacity: colors.opacity,
-        }}
-      />
-      <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "baseline", justifyContent: "space-between", gap: 6 }}>
-        <Text style={text.strong}>Antigravity</Text>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
+        <PlatformIcon platform="antigravity" />
         <Text style={text.small}>
-          {usage.lastSuccessAt ? `Updated ${formatAge(usage.lastSuccessAt)}` : "Not loaded yet"}
+          {usage.lastSuccessAt ? formatAge(usage.lastSuccessAt) : "Not loaded yet"}
           {usage.refreshing ? " · Refreshing…" : ""}
         </Text>
       </View>
       <View style={{ gap: compact ? 8 : 10, opacity: stale ? 0.55 : 1 }}>
         {usage.groups.map((group, groupIndex) => (
           <View key={`${group.name}-${groupIndex}`} style={{ gap: 6 }}>
-            <Text style={[text.small, { color: theme.colors.foreground, fontWeight: "600" }]}>{group.name}</Text>
-            {group.buckets.map((bucket, bucketIndex) => (
+            <Text style={[text.small, { color: theme.colors.foreground }]}>{displayGroupName(group.name)}</Text>
+            {orderAntigravityBuckets(group.buckets).map((bucket, bucketIndex) => (
               <RemainingBar key={`${bucket.id}-${bucketIndex}`} theme={theme} bucket={bucket} />
             ))}
           </View>
