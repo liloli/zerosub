@@ -256,52 +256,115 @@ export function Badge({
   );
 }
 
-export function UsageBar({ theme, limit }: { theme: Theme; limit: UsageWindow }) {
+export function parseResetText(resetText: string): { dateTime: string; countdown?: string } {
+  const match = resetText.match(/^(.*?)(?:\s+(\(.*\)))?$/);
+  if (match && match[1] && match[2]) {
+    return { dateTime: match[1], countdown: match[2] };
+  }
+  return { dateTime: resetText };
+}
+
+export function quotaRemainingColor(
+  remaining: number | null,
+  colors: Theme["colors"],
+): string {
+  if (remaining === null) return colors.statusSuccess;
+  if (remaining <= 10) return colors.statusDanger;
+  if (remaining <= 30) return colors.statusWarning;
+  return colors.statusSuccess;
+}
+
+export function quotaRemainingPercent(
+  usedOrRemaining: number | null | undefined,
+  isUsed: boolean,
+): number | null {
+  if (usedOrRemaining === null || usedOrRemaining === undefined || !Number.isFinite(usedOrRemaining)) {
+    return null;
+  }
+  const val = isUsed ? 100 - usedOrRemaining : usedOrRemaining;
+  return Math.max(0, Math.min(100, val));
+}
+
+export function QuotaBar({
+  theme,
+  label,
+  remainingPercent,
+  resetsAt,
+}: {
+  theme: Theme;
+  label: string;
+  remainingPercent: number | null;
+  resetsAt: string | null | undefined;
+}) {
   const colors = theme.colors;
-  const percent = Math.min(100, Math.max(0, limit.usedPercent));
-  const fill =
-    percent >= 90 ? colors.statusDanger : percent >= 70 ? colors.statusWarning : colors.statusSuccess;
-  const reset = formatResetIn(limit.resetsAt);
+  const remaining =
+    remainingPercent !== null && Number.isFinite(remainingPercent)
+      ? Math.max(0, Math.min(100, remainingPercent))
+      : null;
+  const fill = quotaRemainingColor(remaining, colors);
+  const resetStr = resetsAt ? formatResetIn(resetsAt) : null;
+  const parsedReset = resetStr ? parseResetText(resetStr) : null;
+
   return (
     <View style={{ gap: 4 }}>
       <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", columnGap: 8 }}>
-        <Text style={{ color: colors.foregroundMuted, fontSize: 12 }}>{limit.label}</Text>
+        <Text style={{ color: colors.foregroundMuted, fontSize: 12 }}>{label}</Text>
         <Text style={{ color: colors.foregroundMuted, fontSize: 12 }}>
-          <Text style={{ color: colors.foreground, fontWeight: "600" }}>{formatPercent(percent)}</Text> used
-          {reset ? ` · resets ${reset}` : ""}
+          <Text style={{ color: colors.foreground, fontWeight: "600" }}>
+            {remaining !== null ? formatPercent(remaining) : "unknown"}
+          </Text>
+          {parsedReset ? (
+            <>
+              {" · resets "}
+              <Text style={{ color: colors.foreground }}>{parsedReset.dateTime}</Text>
+              {parsedReset.countdown ? (
+                <Text style={{ color: colors.foregroundMuted }}> {parsedReset.countdown}</Text>
+              ) : null}
+            </>
+          ) : null}
         </Text>
       </View>
       <View
         accessibilityRole="progressbar"
-        accessibilityLabel={`${limit.label} usage`}
-        accessibilityValue={{ min: 0, max: 100, now: Math.round(percent) }}
+        accessibilityLabel={`${label} remaining`}
+        accessibilityValue={
+          remaining === null ? { text: "unknown" } : { min: 0, max: 100, now: Math.round(remaining) }
+        }
         style={{ height: 6, borderRadius: 3, backgroundColor: colors.surface2, overflow: "hidden" }}
       >
-        <View style={{ width: `${percent}%`, height: 6, borderRadius: 3, backgroundColor: fill }} />
+        <View style={{ width: `${remaining ?? 0}%`, height: 6, borderRadius: 3, backgroundColor: fill }} />
       </View>
     </View>
   );
 }
 
-export function RemainingBar({ theme, bucket }: { theme: Theme; bucket: AntigravityView["groups"][number]["buckets"][number] }) {
-  const colors = theme.colors;
-  const percent = bucket.remainingPercent;
-  const fill = percent !== null && percent <= 10 ? colors.statusDanger
-    : percent !== null && percent <= 25 ? colors.statusWarning : colors.statusSuccess;
+export function UsageBar({ theme, limit }: { theme: Theme; limit: UsageWindow }) {
+  const remaining = quotaRemainingPercent(limit.usedPercent, true);
   return (
-    <View style={{ gap: 4 }}>
-      <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", gap: 8 }}>
-        <Text style={{ color: colors.foregroundMuted, fontSize: 12 }}>{bucket.label}</Text>
-        <Text style={{ color: colors.foreground, fontSize: 12 }}>
-          {percent === null ? "unknown" : `${formatPercent(percent)} left`} · Resets {formatResetIn(bucket.resetsAt) ?? "unknown"}
-        </Text>
-      </View>
-      <View accessibilityRole="progressbar" accessibilityLabel={`${bucket.label} remaining`}
-        accessibilityValue={percent === null ? { text: "unknown" } : { min: 0, max: 100, now: percent }}
-        style={{ height: 6, borderRadius: 3, backgroundColor: colors.surface2, overflow: "hidden" }}>
-        <View style={{ width: `${percent ?? 0}%`, height: 6, borderRadius: 3, backgroundColor: fill }} />
-      </View>
-    </View>
+    <QuotaBar
+      theme={theme}
+      label={limit.label}
+      remainingPercent={remaining}
+      resetsAt={limit.resetsAt}
+    />
+  );
+}
+
+export function RemainingBar({
+  theme,
+  bucket,
+}: {
+  theme: Theme;
+  bucket: AntigravityView["groups"][number]["buckets"][number];
+}) {
+  const remaining = quotaRemainingPercent(bucket.remainingPercent, false);
+  return (
+    <QuotaBar
+      theme={theme}
+      label={bucket.label}
+      remainingPercent={remaining}
+      resetsAt={bucket.resetsAt}
+    />
   );
 }
 

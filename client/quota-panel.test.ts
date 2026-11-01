@@ -219,17 +219,17 @@ describe("explorer quota panel", () => {
     expect(rpc).toHaveBeenCalledTimes(1);
     expect(output).toContain("work-claude");
     expect(output).toContain("5-hour");
-    expect(output).toContain("34% used · resets 22:00 (2h)");
+    expect(output).toContain("66% · resets 22:00 (2h)");
     expect(output).toContain("Weekly");
-    expect(output).toContain("72% used · resets 11-03 20:00 (2d)");
+    expect(output).toContain("28% · resets 11-03 20:00 (2d)");
     expect(output).toContain("Antigravity");
     expect(output).toContain("Gemini Pro");
-    expect(output).toContain("80% left · Resets 11-02 00:00 (4h)");
+    expect(output).toContain("80% · resets 11-02 00:00 (4h)");
     expect(output.indexOf("OpenCode Go")).toBeGreaterThan(output.indexOf("Antigravity"));
-    expect(output).toContain("0% used · resets 22:00 (2h)");
-    expect(output).toContain("40% used · resets 11-03 20:00 (2d)");
+    expect(output).toContain("100% · resets 22:00 (2h)");
+    expect(output).toContain("60% · resets 11-03 20:00 (2d)");
     expect(output).toContain("Monthly");
-    expect(output).toContain("49% used · resets 11-08 20:00 (7d)");
+    expect(output).toContain("51% · resets 11-08 20:00 (7d)");
 
     const { AccountsSurface } = await import("./accounts-surface");
     const { createZeroSubStore } = await import("./store");
@@ -238,7 +238,7 @@ describe("explorer quota panel", () => {
     const accountsProps = { ...props, store } as unknown as Parameters<typeof AccountsSurface>[0];
     const accountsOutput = renderText(createElement(AccountsSurface, accountsProps));
     expect(accountsOutput.indexOf("OpenCode Go")).toBeGreaterThan(accountsOutput.indexOf("Antigravity"));
-    expect(accountsOutput).toContain("49% used · resets 11-08 20:00 (7d)");
+    expect(accountsOutput).toContain("51% · resets 11-08 20:00 (7d)");
     state.opencodeGo = { ...state.opencodeGo, status: "error", error: "OpenCode Go usage failed (HTTP 401)." };
     await store.refresh();
     expect(renderText(createElement(AccountsSurface, accountsProps))).toContain("OpenCode Go usage failed (HTTP 401).");
@@ -376,5 +376,114 @@ describe("explorer quota panel", () => {
     expect(platformTint("opencodeGo", THEME)).toBe(OPENCODE_GO_TINT);
     expect(OPENCODE_GO_TINT).toBe("#8B5CF6");
     expect(PLATFORM_TINT_OPACITY).toBe(0.12);
+  });
+
+  describe("quota remaining unification and display hierarchy", () => {
+    it("converts used percent to remaining percent symmetrically and preserves remaining percent", async () => {
+      const { quotaRemainingPercent } = await import("./ui");
+
+      // Used -> Remaining (100 - used)
+      expect(quotaRemainingPercent(0, true)).toBe(100);
+      expect(quotaRemainingPercent(34, true)).toBe(66);
+      expect(quotaRemainingPercent(72, true)).toBe(28);
+      expect(quotaRemainingPercent(100, true)).toBe(0);
+      expect(quotaRemainingPercent(-10, true)).toBe(100); // clamped
+      expect(quotaRemainingPercent(120, true)).toBe(0); // clamped
+
+      // Already remaining (raw preserved and clamped)
+      expect(quotaRemainingPercent(80, false)).toBe(80);
+      expect(quotaRemainingPercent(0, false)).toBe(0);
+      expect(quotaRemainingPercent(100, false)).toBe(100);
+      expect(quotaRemainingPercent(-5, false)).toBe(0);
+      expect(quotaRemainingPercent(110, false)).toBe(100);
+
+      // Unknown / missing data: must return null (NEVER 100%)
+      expect(quotaRemainingPercent(null, true)).toBeNull();
+      expect(quotaRemainingPercent(undefined, true)).toBeNull();
+      expect(quotaRemainingPercent(Number.NaN, true)).toBeNull();
+      expect(quotaRemainingPercent(null, false)).toBeNull();
+      expect(quotaRemainingPercent(undefined, false)).toBeNull();
+      expect(quotaRemainingPercent(Number.NaN, false)).toBeNull();
+    });
+
+    it("applies symmetric remaining color thresholds (<=10 danger, <=30 warning, >30 success)", async () => {
+      const { quotaRemainingColor } = await import("./ui");
+
+      // Danger (<=10% remaining, symmetric with used >= 90%)
+      expect(quotaRemainingColor(0, THEME.colors)).toBe(THEME.colors.statusDanger);
+      expect(quotaRemainingColor(5, THEME.colors)).toBe(THEME.colors.statusDanger);
+      expect(quotaRemainingColor(10, THEME.colors)).toBe(THEME.colors.statusDanger);
+
+      // Warning (<=30% remaining, symmetric with used >= 70%)
+      expect(quotaRemainingColor(11, THEME.colors)).toBe(THEME.colors.statusWarning);
+      expect(quotaRemainingColor(25, THEME.colors)).toBe(THEME.colors.statusWarning);
+      expect(quotaRemainingColor(30, THEME.colors)).toBe(THEME.colors.statusWarning);
+
+      // Success (>30% remaining, symmetric with used < 70%)
+      expect(quotaRemainingColor(31, THEME.colors)).toBe(THEME.colors.statusSuccess);
+      expect(quotaRemainingColor(66, THEME.colors)).toBe(THEME.colors.statusSuccess);
+      expect(quotaRemainingColor(100, THEME.colors)).toBe(THEME.colors.statusSuccess);
+    });
+
+    it("parses reset strings into dateTime and countdown parts", async () => {
+      const { parseResetText } = await import("./ui");
+
+      expect(parseResetText("21:40 (4h 26m)")).toEqual({
+        dateTime: "21:40",
+        countdown: "(4h 26m)",
+      });
+      expect(parseResetText("11-04 17:24 (3d)")).toEqual({
+        dateTime: "11-04 17:24",
+        countdown: "(3d)",
+      });
+      expect(parseResetText("now")).toEqual({
+        dateTime: "now",
+      });
+    });
+
+    it("renders UsageBar and RemainingBar without used/left and handles unknown data gracefully", async () => {
+      const { UsageBar, RemainingBar } = await import("./ui");
+
+      // Normal UsageBar
+      const normalBar = createElement(UsageBar, {
+        theme: THEME,
+        limit: { id: "5h", label: "5-hour", usedPercent: 34, resetsAt: "2026-11-01T14:00:00Z" },
+      });
+      const normalText = renderText(normalBar);
+      expect(normalText).toContain("66% · resets 22:00 (2h)");
+      expect(normalText).not.toContain("used");
+      expect(normalText).not.toContain("left");
+
+      // Unknown UsageBar: must NOT render 100%
+      const unknownBar = createElement(UsageBar, {
+        theme: THEME,
+        limit: { id: "5h", label: "5-hour", usedPercent: null as unknown as number, resetsAt: null },
+      });
+      const unknownText = renderText(unknownBar);
+      expect(unknownText).toContain("unknown");
+      expect(unknownText).not.toContain("100%");
+      expect(unknownText).not.toContain("used");
+      expect(unknownText).not.toContain("left");
+
+      // Normal RemainingBar
+      const normalRemBar = createElement(RemainingBar, {
+        theme: THEME,
+        bucket: { id: "gemini", label: "Gemini", window: "daily", remainingPercent: 80, resetsAt: "2026-11-01T16:00:00Z" },
+      });
+      const normalRemText = renderText(normalRemBar);
+      expect(normalRemText).toContain("80% · resets 11-02 00:00 (4h)");
+      expect(normalRemText).not.toContain("left");
+      expect(normalRemText).not.toContain("used");
+
+      // Unknown RemainingBar: must NOT render 100%
+      const unknownRemBar = createElement(RemainingBar, {
+        theme: THEME,
+        bucket: { id: "gemini", label: "Gemini", window: "daily", remainingPercent: null, resetsAt: null },
+      });
+      const unknownRemText = renderText(unknownRemBar);
+      expect(unknownRemText).toContain("unknown");
+      expect(unknownRemText).not.toContain("100%");
+      expect(unknownRemText).not.toContain("left");
+    });
   });
 });
