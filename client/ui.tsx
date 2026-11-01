@@ -318,7 +318,7 @@ export function QuotaBar({
               {" · resets "}
               <Text style={{ color: colors.foreground }}>{parsedReset.dateTime}</Text>
               {parsedReset.countdown ? (
-                <Text style={{ color: colors.foregroundMuted }}> {parsedReset.countdown}</Text>
+                <Text style={{ color: colors.foregroundMuted, opacity: 0.6 }}> {parsedReset.countdown}</Text>
               ) : null}
             </>
           ) : null}
