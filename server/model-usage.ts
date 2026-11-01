@@ -71,6 +71,7 @@ const UnifiedReportSchema = z.object({
           .array(
             z.object({
               agent: z.string(),
+              totalTokens: z.number().optional(),
               modelBreakdowns: z.array(BreakdownSchema).default([]),
             }),
           )
@@ -169,11 +170,20 @@ interface MutableBucket {
   cacheReadTokens: number;
   cacheWriteTokens: number;
   reasoningTokens: number;
+  totalTokens: number;
   costUsd: number;
 }
 
 function emptyBucket(): MutableBucket {
-  return { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, reasoningTokens: 0, costUsd: 0 };
+  return {
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheReadTokens: 0,
+    cacheWriteTokens: 0,
+    reasoningTokens: 0,
+    totalTokens: 0,
+    costUsd: 0,
+  };
 }
 
 function addBucket(target: MutableBucket, add: MutableBucket): void {
@@ -182,23 +192,45 @@ function addBucket(target: MutableBucket, add: MutableBucket): void {
   target.cacheReadTokens += add.cacheReadTokens;
   target.cacheWriteTokens += add.cacheWriteTokens;
   target.reasoningTokens += add.reasoningTokens;
+  target.totalTokens += add.totalTokens;
   target.costUsd += add.costUsd;
 }
 
 function finalizeTotals(bucket: MutableBucket, sessionCount: number): TokenTotals {
-  const totalTokens =
-    bucket.inputTokens + bucket.outputTokens + bucket.cacheReadTokens + bucket.cacheWriteTokens;
   return {
     inputTokens: bucket.inputTokens,
     outputTokens: bucket.outputTokens,
     cacheReadTokens: bucket.cacheReadTokens,
     cacheWriteTokens: bucket.cacheWriteTokens,
     reasoningTokens: bucket.reasoningTokens,
-    totalTokens,
+    totalTokens: bucket.totalTokens,
     costUsd: bucket.costUsd,
     cacheHitRate: computeCacheHitRate(bucket.inputTokens, bucket.cacheReadTokens, bucket.cacheWriteTokens),
     sessionCount,
   };
+}
+
+function allocateExtraTokens(extraTokens: number, weights: readonly number[]): number[] {
+  const count = weights.length;
+  if (count === 0) return [];
+  if (extraTokens <= 0) return weights.map(() => 0);
+  if (count === 1) return [extraTokens];
+  const totalWeight = weights.reduce((acc, w) => acc + w, 0);
+  if (totalWeight <= 0) {
+    const base = Math.floor(extraTokens / count);
+    const rem = extraTokens - base * count;
+    return weights.map((_, i) => base + (i < rem ? 1 : 0));
+  }
+  const exact = weights.map((w) => (extraTokens * w) / totalWeight);
+  const result = exact.map((v) => Math.floor(v));
+  const rem = extraTokens - result.reduce((acc, v) => acc + v, 0);
+  const order = exact
+    .map((v, i) => ({ i, frac: v - result[i]! }))
+    .sort((a, b) => b.frac - a.frac || a.i - b.i);
+  for (let k = 0; k < rem; k++) {
+    result[order[k]!.i]! += 1;
+  }
+  return result;
 }
 
 function isTargetPlatform(agent: string): agent is ModelPlatform {
@@ -268,16 +300,26 @@ export function aggregateModelUsage(options: {
     for (const agentRow of dayRow.agents) {
       if (!isTargetPlatform(agentRow.agent)) continue;
       const platform = agentRow.agent;
-      for (const mb of agentRow.modelBreakdowns) {
+      const baseTotals = agentRow.modelBreakdowns.map(
+        (mb) => mb.inputTokens + mb.outputTokens + mb.cacheReadTokens + mb.cacheCreationTokens,
+      );
+      const sumFour = baseTotals.reduce((acc, v) => acc + v, 0);
+      const extraReasoning = Math.max(0, Math.round((agentRow.totalTokens ?? sumFour) - sumFour));
+      const allocatedExtra = allocateExtraTokens(extraReasoning, baseTotals);
+
+      for (let i = 0; i < agentRow.modelBreakdowns.length; i++) {
+        const mb = agentRow.modelBreakdowns[i]!;
+        const extra = allocatedExtra[i]!;
         const { key, entry } = ensureModel(platform, mb.modelName);
         const reasoningTokens =
-          platform === "codex" ? (codexReasoning.get(`${date}\0${mb.modelName}`) ?? 0) : 0;
+          (platform === "codex" ? (codexReasoning.get(`${date}\0${mb.modelName}`) ?? 0) : 0) + extra;
         const delta: MutableBucket = {
           inputTokens: mb.inputTokens,
           outputTokens: mb.outputTokens,
           cacheReadTokens: mb.cacheReadTokens,
           cacheWriteTokens: mb.cacheCreationTokens,
           reasoningTokens,
+          totalTokens: baseTotals[i]! + extra,
           costUsd: mb.cost,
         };
         addBucket(entry.bucket, delta);

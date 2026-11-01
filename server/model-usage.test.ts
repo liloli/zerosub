@@ -307,6 +307,105 @@ describe("model usage aggregation", () => {
     expect(summary.limitations).toEqual([...MODEL_USAGE_LIMITATIONS]);
   });
 
+  it("attributes agent-day totalTokens surplus as reasoning tokens and matches ccusage platform totals", () => {
+    const summary = aggregateModelUsage({
+      unified: {
+        daily: [
+          {
+            period: "2026-10-28",
+            agents: [
+              {
+                // Single-model day: 1000 four-bucket tokens, 1350 reported totalTokens -> 350 reasoning tokens
+                agent: "opencode",
+                totalTokens: 1350,
+                modelBreakdowns: [
+                  {
+                    modelName: "deepseek-v4.1-flash",
+                    inputTokens: 200,
+                    outputTokens: 100,
+                    cacheReadTokens: 700,
+                    cacheCreationTokens: 0,
+                    cost: 0.4,
+                  },
+                ],
+              },
+              {
+                // Multi-model day: 300 + 100 = 400 four-bucket tokens, 501 reported totalTokens -> 101 reasoning split 3:1 (76 + 25 = 101)
+                agent: "antigravity",
+                totalTokens: 501,
+                modelBreakdowns: [
+                  {
+                    modelName: "gemini-4-argon",
+                    inputTokens: 100,
+                    outputTokens: 50,
+                    cacheReadTokens: 150,
+                    cacheCreationTokens: 0,
+                    cost: 1.2,
+                  },
+                  {
+                    modelName: "model_placeholder_m401",
+                    inputTokens: 20,
+                    outputTokens: 10,
+                    cacheReadTokens: 70,
+                    cacheCreationTokens: 0,
+                    cost: 0,
+                    missingPricing: true,
+                  },
+                ],
+              },
+              {
+                // Codex day: totalTokens already equals four-bucket sum (reasoning is inside outputTokens)
+                agent: "codex",
+                totalTokens: 1000,
+                modelBreakdowns: [
+                  {
+                    modelName: "gpt-6.1-sol",
+                    inputTokens: 200,
+                    outputTokens: 300,
+                    cacheReadTokens: 500,
+                    cacheCreationTokens: 0,
+                    cost: 2.0,
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        session: [],
+      },
+      codexDaily: {
+        daily: [{ date: "2026-10-28", models: { "gpt-6.1-sol": { reasoningOutputTokens: 120 } } }],
+      },
+      since: "2026-10-02",
+      until: "2026-11-01",
+      timeZone: "UTC",
+    });
+
+    const opencode = summary.platforms.find((p) => p.platform === "opencode")!;
+    expect(opencode.totalTokens).toBe(1350);
+    expect(opencode.reasoningTokens).toBe(350);
+
+    const antigravity = summary.platforms.find((p) => p.platform === "antigravity")!;
+    expect(antigravity.totalTokens).toBe(501);
+    expect(antigravity.reasoningTokens).toBe(101);
+
+    const argon = summary.models.find((m) => m.platform === "antigravity" && m.model === "gemini-4-argon")!;
+    const agyOpus = summary.models.find((m) => m.platform === "antigravity" && m.model === "AGY Opus")!;
+    expect(argon.reasoningTokens).toBe(76);
+    expect(argon.totalTokens).toBe(376);
+    expect(agyOpus.reasoningTokens).toBe(25);
+    expect(agyOpus.totalTokens).toBe(125);
+    expect(argon.totalTokens + agyOpus.totalTokens).toBe(501);
+
+    const codex = summary.platforms.find((p) => p.platform === "codex")!;
+    expect(codex.totalTokens).toBe(1000);
+    expect(codex.reasoningTokens).toBe(120);
+
+    expect(summary.daily[0]?.totalTokens).toBe(1350 + 501 + 1000);
+    expect(summary.daily[0]?.reasoningTokens).toBe(350 + 101 + 120);
+    expect(summary.totals.totalTokens).toBe(1350 + 501 + 1000);
+  });
+
   it("caches results for 10 minutes across refreshes and restarts, and exposes summary on StateView", async () => {
     const okResult = (payload: unknown): RunResult => ({
       code: 0,
