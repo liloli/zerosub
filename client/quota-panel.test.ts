@@ -366,13 +366,15 @@ describe("explorer quota panel", () => {
     cleanup();
   });
 
-  it("assigns distinct theme-based tints to ChatGPT, Claude, Antigravity, and OpenCode Go", async () => {
-    const { platformTint } = await import("./quota-panel");
+  it("assigns distinct vibrant brand tints to ChatGPT, Claude, Antigravity, and OpenCode Go", async () => {
+    const { platformTint, PLATFORM_TINT_OPACITY } = await import("./quota-panel");
     const { OPENCODE_GO_TINT } = await import("./opencode-go-card");
 
-    expect(platformTint("codex", THEME)).toBe(THEME.colors.statusSuccess);
-    expect(platformTint("claude", THEME)).toBe(THEME.colors.statusWarning);
-    expect(platformTint("antigravity", THEME)).toBe(THEME.colors.accent);
+    expect(platformTint("codex", THEME)).toBe("#10A37F");
+    expect(platformTint("claude", THEME)).toBe("#D97757");
+    expect(platformTint("antigravity", THEME)).toBe("#4285F4");
     expect(platformTint("opencodeGo", THEME)).toBe(OPENCODE_GO_TINT);
+    expect(OPENCODE_GO_TINT).toBe("#8B5CF6");
+    expect(PLATFORM_TINT_OPACITY).toBe(0.12);
   });
 });

@@ -4,25 +4,27 @@ import { formatAge, formatCredits, usageSummary } from "../shared/format";
 import { FAMILY_LABEL, type AccountView, type AntigravityView, type Family } from "../shared/model";
 import { useStore, type ZeroSubStore } from "./store";
 import { Badge, RemainingBar, UsageBar, useText } from "./ui";
-import { OPENCODE_GO_TINT, OpenCodeGoCard } from "./opencode-go-card";
+import { OPENCODE_GO_TINT, OpenCodeGoCard, PLATFORM_TINT_OPACITY } from "./opencode-go-card";
+
+export { PLATFORM_TINT_OPACITY };
 
 type Theme = PluginWorkspacePanelProps["theme"];
 
 export function platformTint(
   platform: Family | "antigravity" | "opencodeGo" | string,
-  theme: Theme,
+  theme?: Theme,
 ): string {
   switch (platform) {
     case "codex":
-      return theme.colors.statusSuccess;
+      return "#10A37F";
     case "claude":
-      return theme.colors.statusWarning;
+      return "#D97757";
     case "antigravity":
-      return theme.colors.accent;
+      return "#4285F4";
     case "opencodeGo":
       return OPENCODE_GO_TINT;
     default:
-      return theme.colors.accent;
+      return theme?.colors.accent ?? "#4285F4";
   }
 }
 
@@ -104,7 +106,7 @@ function AccountRow({
         borderRadius: 10,
         borderWidth: 1,
         borderColor: theme.colors.border,
-        backgroundColor: theme.colors.surface1,
+        backgroundColor: theme.colors.surface0,
         overflow: "hidden",
       }}
     >
@@ -117,7 +119,7 @@ function AccountRow({
           right: 0,
           bottom: 0,
           backgroundColor: platformTint(account.family, theme),
-          opacity: 0.06,
+          opacity: PLATFORM_TINT_OPACITY,
         }}
       />
       <View
@@ -175,7 +177,7 @@ function AntigravitySection({
         borderRadius: 10,
         borderWidth: 1,
         borderColor: theme.colors.border,
-        backgroundColor: theme.colors.surface1,
+        backgroundColor: theme.colors.surface0,
         overflow: "hidden",
       }}
     >
@@ -188,7 +190,7 @@ function AntigravitySection({
           right: 0,
           bottom: 0,
           backgroundColor: platformTint("antigravity", theme),
-          opacity: 0.06,
+          opacity: PLATFORM_TINT_OPACITY,
         }}
       />
       <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "baseline", justifyContent: "space-between", gap: 6 }}>
