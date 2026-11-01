@@ -108,7 +108,7 @@ function AccountRow({
           ) : !signedOut ? (
             <Text style={text.small}>Not loaded yet</Text>
           ) : null}
-          {account.isDefault ? <Badge theme={theme} label="Default" tone="accent" /> : null}
+          {account.isDefault ? <Text accessibilityLabel="Default">🟢</Text> : null}
           {account.status === "limited" ? <Badge theme={theme} label="Limit reached" tone="danger" /> : null}
           {disabled ? <Badge theme={theme} label="Disabled" /> : null}
           {signedOut ? <Badge theme={theme} label="Signed out" tone="warning" /> : null}

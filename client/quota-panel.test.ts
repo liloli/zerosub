@@ -221,18 +221,19 @@ describe("explorer quota panel", () => {
     const output = renderText(createElement(panel.Component, props));
     expect(rpc).toHaveBeenCalledTimes(1);
     expect(output).toContain("work-claude");
+    expect(output).toContain("🟢");
     expect(output).toContain("5h");
-    expect(output).toContain("66% · 22:00  2h");
+    expect(output).toContain("66%    22:00    2h");
     expect(output).toContain("weekly");
-    expect(output).toContain("28% · 11-03 20:00  2d");
+    expect(output).toContain("28%    11-03 20:00    2d");
     expect(output).toContain("Antigravity");
     expect(output).toContain("Gemini Pro");
-    expect(output).toContain("80% · 11-02 00:00  4h");
+    expect(output).toContain("80%    11-02 00:00    4h");
     expect(output.indexOf("OpenCode Go")).toBeGreaterThan(output.indexOf("Antigravity"));
-    expect(output).toContain("100% · 22:00  2h");
-    expect(output).toContain("60% · 11-03 20:00  2d");
+    expect(output).toContain("100%    22:00    2h");
+    expect(output).toContain("60%    11-03 20:00    2d");
     expect(output).toContain("Monthly");
-    expect(output).toContain("51% · 11-08 20:00  7d");
+    expect(output).toContain("51%    11-08 20:00    7d");
 
     const { AccountsSurface } = await import("./accounts-surface");
     const { createZeroSubStore } = await import("./store");
@@ -241,7 +242,7 @@ describe("explorer quota panel", () => {
     const accountsProps = { ...props, store } as unknown as Parameters<typeof AccountsSurface>[0];
     const accountsOutput = renderText(createElement(AccountsSurface, accountsProps));
     expect(accountsOutput.indexOf("OpenCode Go")).toBeGreaterThan(accountsOutput.indexOf("Antigravity"));
-    expect(accountsOutput).toContain("51% · 11-08 20:00  7d");
+    expect(accountsOutput).toContain("51%    11-08 20:00    7d");
     state.opencodeGo = { ...state.opencodeGo, status: "error", error: "OpenCode Go usage failed (HTTP 401)." };
     await store.refresh();
     expect(renderText(createElement(AccountsSurface, accountsProps))).toContain("OpenCode Go usage failed (HTTP 401).");
@@ -450,7 +451,7 @@ describe("explorer quota panel", () => {
         limit: { id: "5h", label: "5-hour", usedPercent: 34, resetsAt: "2026-11-01T14:00:00Z" },
       });
       const normalText = renderText(normalBar);
-      expect(normalText).toContain("66% · 22:00  2h");
+      expect(normalText).toContain("66%    22:00    2h");
       expect(normalText).not.toContain("resets");
       expect(normalText).not.toContain("used");
       expect(normalText).not.toContain("left");
@@ -472,7 +473,7 @@ describe("explorer quota panel", () => {
         bucket: { id: "gemini", label: "Gemini", window: "daily", remainingPercent: 80, resetsAt: "2026-11-01T16:00:00Z" },
       });
       const normalRemText = renderText(normalRemBar);
-      expect(normalRemText).toContain("80% · 11-02 00:00  4h");
+      expect(normalRemText).toContain("80%    11-02 00:00    4h");
       expect(normalRemText).not.toContain("resets");
       expect(normalRemText).not.toContain("left");
       expect(normalRemText).not.toContain("used");
