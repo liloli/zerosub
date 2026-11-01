@@ -1,3 +1,4 @@
+import { AntigravityMonitor } from "./server/antigravity";
 import type { PluginServerContext, PluginSettingsState } from "@getpaseo/plugin/server";
 import { ClaudeAdapter } from "./server/claude";
 import { CodexAdapter } from "./server/codex";
@@ -19,7 +20,7 @@ import {
 } from "./shared/rpc";
 
 export default function contribute(server: PluginServerContext) {
-  const service = new Service({ claude: new ClaudeAdapter(), codex: new CodexAdapter() });
+  const service = new Service({ claude: new ClaudeAdapter(), codex: new CodexAdapter() }, undefined, undefined, undefined, new AntigravityMonitor());
 
   const settings = server.registerSettings(preferences);
   const applySettings = (state: PluginSettingsState<typeof preferences.schema>) => {

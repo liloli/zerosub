@@ -132,7 +132,26 @@ export const LoginViewSchema = z.object({
 });
 export type LoginView = z.infer<typeof LoginViewSchema>;
 
+export const AntigravityGroupSchema = z.object({
+  name: z.string(),
+  buckets: z.array(z.object({
+    id: z.string(), label: z.string(), window: z.string(),
+    remainingPercent: z.number().min(0).max(100).nullable(),
+    resetsAt: z.string().nullable(),
+  })),
+});
+export const AntigravityViewSchema = z.object({
+  status: z.enum(["loading", "ok", "stale", "error", "unavailable"]),
+  refreshing: z.boolean(),
+  groups: z.array(AntigravityGroupSchema),
+  lastSuccessAt: z.string().nullable(),
+  lastAttemptAt: z.string().nullable(),
+  error: z.string().nullable(),
+});
+export type AntigravityView = z.infer<typeof AntigravityViewSchema>;
+
 export const StateViewSchema = z.object({
+  antigravity: AntigravityViewSchema.optional(),
   accounts: z.array(AccountViewSchema),
   agents: z.array(AgentRouteSchema),
   logins: z.array(LoginViewSchema),

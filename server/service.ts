@@ -1,3 +1,4 @@
+import type { AntigravityMonitor } from "./antigravity";
 import { execFile } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
@@ -202,6 +203,7 @@ export class Service {
     private readonly store = new StateStore(),
     private readonly families = new FamilyResolver(),
     private readonly reopener = new Reopener(),
+    private readonly antigravity?: AntigravityMonitor,
   ) {
     this.continuations = new CodexContinuations(store);
   }
@@ -216,6 +218,7 @@ export class Service {
   }
 
   async start(): Promise<void> {
+    void this.antigravity?.start();
     // The last readings show right away; fresh ones replace them as they arrive.
     for (const [accountId, reading] of await loadReadings()) if (!this.usage.has(accountId)) this.usage.set(accountId, reading);
     await Promise.all(FAMILIES.map((family) => this.ensureFamily(family)));
@@ -226,6 +229,7 @@ export class Service {
 
   async stop(): Promise<void> {
     this.stopped = true;
+    this.antigravity?.stop();
     if (this.timer) clearInterval(this.timer);
     if (this.usageSave) {
       clearTimeout(this.usageSave);
@@ -1452,6 +1456,7 @@ export class Service {
   async view(paseo: PaseoApi, refreshUsage = false): Promise<StateView> {
     this.attach(paseo);
     if (refreshUsage) {
+      void this.antigravity?.refresh(true);
       const state = await this.store.read();
       await Promise.allSettled(state.accounts.map((account) => this.refreshUsage(account.id, true, true)));
     }
@@ -1502,6 +1507,7 @@ export class Service {
 
     return {
       accounts,
+      antigravity: this.antigravity?.view(),
       agents: routes,
       logins: [...this.logins.values()].map((login) => login.view),
       providers: families,

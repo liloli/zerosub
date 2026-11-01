@@ -3,7 +3,7 @@ import { Icon } from "@getpaseo/plugin/client/react-native";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { formatPercent, formatResetIn } from "../shared/format";
-import type { UsageWindow } from "../shared/model";
+import type { AntigravityView, UsageWindow } from "../shared/model";
 
 type Theme = PluginHostProps["theme"];
 
@@ -278,6 +278,28 @@ export function UsageBar({ theme, limit }: { theme: Theme; limit: UsageWindow })
         style={{ height: 6, borderRadius: 3, backgroundColor: colors.surface2, overflow: "hidden" }}
       >
         <View style={{ width: `${percent}%`, height: 6, borderRadius: 3, backgroundColor: fill }} />
+      </View>
+    </View>
+  );
+}
+
+export function RemainingBar({ theme, bucket }: { theme: Theme; bucket: AntigravityView["groups"][number]["buckets"][number] }) {
+  const colors = theme.colors;
+  const percent = bucket.remainingPercent;
+  const fill = percent !== null && percent <= 10 ? colors.statusDanger
+    : percent !== null && percent <= 25 ? colors.statusWarning : colors.statusSuccess;
+  return (
+    <View style={{ gap: 4 }}>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", gap: 8 }}>
+        <Text style={{ color: colors.foregroundMuted, fontSize: 12 }}>{bucket.label}</Text>
+        <Text style={{ color: colors.foreground, fontSize: 12 }}>
+          {percent === null ? "unknown" : `${formatPercent(percent)} left`} · Resets {formatResetIn(bucket.resetsAt) ?? "unknown"}
+        </Text>
+      </View>
+      <View accessibilityRole="progressbar" accessibilityLabel={`${bucket.label} remaining`}
+        accessibilityValue={percent === null ? { text: "unknown" } : { min: 0, max: 100, now: percent }}
+        style={{ height: 6, borderRadius: 3, backgroundColor: colors.surface2, overflow: "hidden" }}>
+        <View style={{ width: `${percent ?? 0}%`, height: 6, borderRadius: 3, backgroundColor: fill }} />
       </View>
     </View>
   );

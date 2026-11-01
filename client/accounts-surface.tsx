@@ -4,7 +4,7 @@ import { SettingsCard, SettingsSwitch } from "@getpaseo/plugin/client/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ScrollView, Text, View } from "react-native";
 import { accountSubtitle, formatAge, formatPlan, usageSummary } from "../shared/format";
-import { FAMILY_LABEL, type AccountView, type Family } from "../shared/model";
+import { FAMILY_LABEL, type AccountView, type AntigravityView, type Family } from "../shared/model";
 import { preferences } from "../shared/preferences";
 import {
   clearAccountLimit,
@@ -17,7 +17,7 @@ import {
 import { AddAccountModal } from "./add-account";
 import { ResetConfirm, redeemToast, resetBadge } from "./reset-confirm";
 import { describe, useStore, VISIBLE_POLL_MS, type ZeroSubStore } from "./store";
-import { Badge, Button, Card, IconButton, UsageBar, useText } from "./ui";
+import { Badge, Button, Card, IconButton, RemainingBar, UsageBar, useText } from "./ui";
 
 type Theme = PluginSurfaceProps["theme"];
 
@@ -123,6 +123,8 @@ export function AccountsSurface(props: PluginSurfaceProps & { store: ZeroSubStor
               />
             ))
           : null}
+
+        {state?.antigravity ? <AntigravityCard theme={theme} usage={state.antigravity} /> : null}
 
         <AutomationSettings theme={theme} />
       </ScrollView>
@@ -600,6 +602,34 @@ function Avatar({ theme, label }: { theme: Theme; label: string }) {
     >
       <Text style={{ color: theme.colors.foreground, fontSize: 15, fontWeight: "700" }}>{initial}</Text>
     </View>
+  );
+}
+
+function AntigravityCard({ theme, usage }: { theme: Theme; usage: AntigravityView }) {
+  const text = useText(theme);
+  if (usage.status === "unavailable") return null;
+  const stale = usage.status === "stale" || usage.status === "error";
+  return (
+    <Card theme={theme}>
+      <Text style={text.heading} accessibilityRole="header">Antigravity</Text>
+      <Text style={text.small}>
+        {usage.lastSuccessAt ? `Updated ${formatAge(usage.lastSuccessAt)}` : "Not loaded yet"}
+        {usage.refreshing ? " · Refreshing…" : ""}
+      </Text>
+      <View style={{ gap: 12, opacity: stale ? 0.55 : 1 }}>
+        {usage.groups.map((group, index) => (
+          <View key={index} style={{ gap: 8 }}>
+            <Text style={text.strong}>{group.name}</Text>
+            {group.buckets.map((bucket, index) => <RemainingBar key={index} theme={theme} bucket={bucket} />)}
+          </View>
+        ))}
+      </View>
+      {stale ? <Text style={text.warning}>
+        {usage.error
+          ? `${usage.lastSuccessAt ? `Showing data from ${formatAge(usage.lastSuccessAt)}. ` : ""}Last refresh failed: ${usage.error}`
+          : usage.lastSuccessAt ? `Showing data from ${formatAge(usage.lastSuccessAt)}.` : "Not loaded yet"}
+      </Text> : null}
+    </Card>
   );
 }
 
