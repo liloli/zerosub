@@ -1,4 +1,5 @@
 import type { AntigravityMonitor } from "./antigravity";
+import type { OpenCodeGoMonitor } from "./opencode-go";
 import { execFile } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
@@ -212,6 +213,7 @@ export class Service {
     private readonly families = new FamilyResolver(),
     private readonly reopener = new Reopener(),
     private readonly antigravity?: AntigravityMonitor,
+    private readonly opencodeGo?: OpenCodeGoMonitor,
   ) {
     this.continuations = new CodexContinuations(store);
   }
@@ -227,6 +229,7 @@ export class Service {
 
   async start(): Promise<void> {
     void this.antigravity?.start();
+    void this.opencodeGo?.start();
     // The last readings show right away; fresh ones replace them as they arrive.
     for (const [accountId, reading] of await loadReadings()) if (!this.usage.has(accountId)) this.usage.set(accountId, reading);
     await Promise.all(FAMILIES.map((family) => this.ensureFamily(family)));
@@ -270,6 +273,7 @@ export class Service {
 
   private async tick(): Promise<void> {
     if (this.stopped) return;
+    void this.opencodeGo?.refresh();
     const now = Date.now();
     for (const family of FAMILIES) {
       const availability = this.availability.get(family);
@@ -1492,6 +1496,7 @@ export class Service {
     this.attach(paseo);
     if (refreshUsage) {
       void this.antigravity?.refresh(true);
+      void this.opencodeGo?.refresh(true);
       const state = await this.store.read();
       await Promise.allSettled(state.accounts.map((account) => this.refreshUsage(account.id, true, true)));
     }
@@ -1548,6 +1553,7 @@ export class Service {
     return {
       accounts,
       antigravity: this.antigravity?.view(),
+      opencodeGo: this.opencodeGo?.view(),
       agents: routes,
       logins: [...this.logins.values()].map((login) => login.view),
       providers: families,

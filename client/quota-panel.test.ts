@@ -12,6 +12,10 @@ vi.mock("react", async () => {
   return {
     ...actual,
     useMemo: <T,>(factory: () => T) => factory(),
+    useState: <T,>(initial: T) => [initial, vi.fn()],
+    useEffect: () => undefined,
+    useCallback: <T,>(callback: T) => callback,
+    useRef: <T,>(current: T) => ({ current }),
     useSyncExternalStore: <T,>(_subscribe: unknown, getSnapshot: () => T) => getSnapshot(),
   };
 });
@@ -96,7 +100,7 @@ describe("explorer quota panel", () => {
     vi.useRealTimers();
   });
 
-  it("registers in explorer and renders account and Antigravity quotas from the shared store", async () => {
+  it("renders both quota surfaces with OpenCode Go after Antigravity, using three used windows", async () => {
     const state: StateView = {
       accounts: [
         {
@@ -153,6 +157,15 @@ describe("explorer quota panel", () => {
       browserSignIn: true,
       showComposerPill: false,
       warnings: [],
+    };
+    state.opencodeGo = {
+      status: "ok", refreshing: false, error: null,
+      lastSuccessAt: "2026-11-01T11:55:00Z", lastAttemptAt: "2026-11-01T11:55:00Z",
+      windows: [
+        { id: "rolling", label: "5-hour", usedPercent: 0, resetsAt: "2026-11-01T14:00:00Z" },
+        { id: "weekly", label: "Weekly", usedPercent: 40, resetsAt: "2026-11-03T12:00:00Z" },
+        { id: "monthly", label: "Monthly", usedPercent: 49, resetsAt: "2026-11-08T12:00:00Z" },
+      ],
     };
 
     const panels: PluginWorkspacePanelContribution[] = [];
@@ -212,6 +225,30 @@ describe("explorer quota panel", () => {
     expect(output).toContain("Antigravity");
     expect(output).toContain("Gemini Pro");
     expect(output).toContain("80% left · Resets in 4h");
+    expect(output.indexOf("OpenCode Go")).toBeGreaterThan(output.indexOf("Antigravity"));
+    expect(output).toContain("0% used · resets in 2h");
+    expect(output).toContain("40% used · resets in 2d");
+    expect(output).toContain("Monthly");
+    expect(output).toContain("49% used · resets in 7d");
+
+    const { AccountsSurface } = await import("./accounts-surface");
+    const { createZeroSubStore } = await import("./store");
+    const store = createZeroSubStore(client as unknown as PluginClientContext);
+    await store.refresh();
+    const accountsProps = { ...props, store } as unknown as Parameters<typeof AccountsSurface>[0];
+    const accountsOutput = renderText(createElement(AccountsSurface, accountsProps));
+    expect(accountsOutput.indexOf("OpenCode Go")).toBeGreaterThan(accountsOutput.indexOf("Antigravity"));
+    expect(accountsOutput).toContain("49% used · resets in 7d");
+    state.opencodeGo = { ...state.opencodeGo, status: "error", error: "OpenCode Go usage failed (HTTP 401)." };
+    await store.refresh();
+    expect(renderText(createElement(AccountsSurface, accountsProps))).toContain("OpenCode Go usage failed (HTTP 401).");
+    state.opencodeGo = { ...state.opencodeGo, status: "unavailable" };
+    await store.refresh();
+    expect(renderText(createElement(AccountsSurface, accountsProps))).not.toContain("OpenCode Go");
+    delete state.opencodeGo;
+    await store.refresh();
+    expect(renderText(createElement(AccountsSurface, accountsProps))).not.toContain("OpenCode Go");
+    store.stop();
 
     cleanup();
   });

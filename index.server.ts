@@ -1,4 +1,5 @@
 import { AntigravityMonitor } from "./server/antigravity";
+import { OpenCodeGoMonitor } from "./server/opencode-go";
 import type { PluginServerContext, PluginSettingsState } from "@getpaseo/plugin/server";
 import { ClaudeAdapter } from "./server/claude";
 import { CodexAdapter } from "./server/codex";
@@ -20,7 +21,7 @@ import {
 } from "./shared/rpc";
 
 export default function contribute(server: PluginServerContext) {
-  const service = new Service({ claude: new ClaudeAdapter(), codex: new CodexAdapter() }, undefined, undefined, undefined, new AntigravityMonitor());
+  const service = new Service({ claude: new ClaudeAdapter(), codex: new CodexAdapter() }, undefined, undefined, undefined, new AntigravityMonitor(), new OpenCodeGoMonitor());
 
   const settings = server.registerSettings(preferences);
   const applySettings = (state: PluginSettingsState<typeof preferences.schema>) => {

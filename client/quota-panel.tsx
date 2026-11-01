@@ -4,6 +4,7 @@ import { formatAge, formatCredits, usageSummary } from "../shared/format";
 import { FAMILY_LABEL, type AccountView, type AntigravityView, type Family } from "../shared/model";
 import { useStore, type ZeroSubStore } from "./store";
 import { Badge, RemainingBar, UsageBar, useText } from "./ui";
+import { OpenCodeGoCard } from "./opencode-go-card";
 
 type Theme = PluginWorkspacePanelProps["theme"];
 
@@ -33,6 +34,7 @@ export function QuotaPanel(props: PluginWorkspacePanelProps & { store: ZeroSubSt
   const antigravity =
     state?.antigravity && state.antigravity.status !== "unavailable" ? state.antigravity : null;
   const accounts = state ? groupAccountsByFamily(state.accounts) : [];
+  const opencodeGo = state?.opencodeGo?.status !== "unavailable" ? state?.opencodeGo : null;
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.surface0 }}>
@@ -44,7 +46,7 @@ export function QuotaPanel(props: PluginWorkspacePanelProps & { store: ZeroSubSt
       >
         {!state && error ? <Text style={text.danger}>Could not reach the daemon: {error}</Text> : null}
         {!state && !error ? <Text style={text.muted}>Loading accounts…</Text> : null}
-        {state && accounts.length === 0 && !antigravity ? (
+        {state && accounts.length === 0 && !antigravity && !opencodeGo ? (
           <Text style={text.muted}>No accounts yet.</Text>
         ) : null}
         {accounts.map((account) => (
@@ -53,6 +55,7 @@ export function QuotaPanel(props: PluginWorkspacePanelProps & { store: ZeroSubSt
         {antigravity ? (
           <AntigravitySection usage={antigravity} theme={theme} compact={layout.compact} />
         ) : null}
+        {opencodeGo ? <OpenCodeGoCard theme={theme} usage={opencodeGo} /> : null}
       </ScrollView>
     </View>
   );

@@ -164,8 +164,14 @@ export const AntigravityViewSchema = z.object({
 });
 export type AntigravityView = z.infer<typeof AntigravityViewSchema>;
 
+export const OpenCodeGoViewSchema = AntigravityViewSchema.omit({ groups: true }).extend({
+  windows: z.array(UsageWindowSchema),
+});
+export type OpenCodeGoView = z.infer<typeof OpenCodeGoViewSchema>;
+
 export const StateViewSchema = z.object({
   antigravity: AntigravityViewSchema.optional(),
+  opencodeGo: OpenCodeGoViewSchema.optional(),
   accounts: z.array(AccountViewSchema),
   agents: z.array(AgentRouteSchema),
   logins: z.array(LoginViewSchema),

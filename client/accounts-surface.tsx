@@ -15,6 +15,7 @@ import {
   type ReopenSummary,
 } from "../shared/rpc";
 import { AddAccountModal } from "./add-account";
+import { OpenCodeGoCard } from "./opencode-go-card";
 import { ResetConfirm, redeemToast, resetBadge } from "./reset-confirm";
 import { describe, useStore, VISIBLE_POLL_MS, type ZeroSubStore } from "./store";
 import { Badge, Button, Card, IconButton, RemainingBar, UsageBar, useText } from "./ui";
@@ -125,6 +126,7 @@ export function AccountsSurface(props: PluginSurfaceProps & { store: ZeroSubStor
           : null}
 
         {state?.antigravity ? <AntigravityCard theme={theme} usage={state.antigravity} /> : null}
+        {state?.opencodeGo ? <OpenCodeGoCard theme={theme} usage={state.opencodeGo} /> : null}
 
         <AutomationSettings theme={theme} />
       </ScrollView>
