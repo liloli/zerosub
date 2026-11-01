@@ -2,6 +2,7 @@ import type { PluginClientContext } from "@getpaseo/plugin/client";
 import { AccountsSurface } from "./client/accounts-surface";
 import { contributeCommands } from "./client/commands";
 import { contributePills } from "./client/pills";
+import { QuotaPanel } from "./client/quota-panel";
 import { PreferencesScreen } from "./client/settings-screen";
 import { createZeroSubStore } from "./client/store";
 import { SwitchRowView } from "./client/switch-row";
@@ -13,6 +14,14 @@ export default function contribute(client: PluginClientContext) {
 
   client.addSurface("accounts", (props) => <AccountsSurface {...props} store={store} />);
   client.addSidebarItem({ id: "accounts", title: "Accounts (ZeroSub)", icon: "Users", surface: "accounts" });
+  client.addWorkspacePanel({
+    id: "quota",
+    title: "Quota",
+    icon: "Users",
+    context: "workspace",
+    locations: ["explorer"],
+    Component: (props) => <QuotaPanel {...props} store={store} />,
+  });
   client.addSettingsScreen({
     id: "preferences",
     title: "ZeroSub preferences",
