@@ -1,11 +1,30 @@
 import type { PluginWorkspacePanelProps } from "@getpaseo/plugin/client";
 import { ScrollView, Text, View } from "react-native";
 import { formatAge, formatCredits, usageSummary } from "../shared/format";
-import { FAMILY_LABEL, type AccountView, type AntigravityView } from "../shared/model";
+import { FAMILY_LABEL, type AccountView, type AntigravityView, type Family } from "../shared/model";
 import { useStore, type ZeroSubStore } from "./store";
 import { Badge, RemainingBar, UsageBar, useText } from "./ui";
 
 type Theme = PluginWorkspacePanelProps["theme"];
+
+const FAMILIES: readonly Family[] = ["codex", "claude"];
+
+export function groupAccountsByFamily(accounts: readonly AccountView[]): AccountView[] {
+  const grouped: AccountView[] = [];
+  for (const family of FAMILIES) {
+    for (const account of accounts) {
+      if (account.family === family) {
+        grouped.push(account);
+      }
+    }
+  }
+  for (const account of accounts) {
+    if (!FAMILIES.includes(account.family)) {
+      grouped.push(account);
+    }
+  }
+  return grouped;
+}
 
 export function QuotaPanel(props: PluginWorkspacePanelProps & { store: ZeroSubStore }) {
   const { theme, layout, store } = props;
@@ -13,6 +32,7 @@ export function QuotaPanel(props: PluginWorkspacePanelProps & { store: ZeroSubSt
   const text = useText(theme);
   const antigravity =
     state?.antigravity && state.antigravity.status !== "unavailable" ? state.antigravity : null;
+  const accounts = state ? groupAccountsByFamily(state.accounts) : [];
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.surface0 }}>
@@ -24,10 +44,10 @@ export function QuotaPanel(props: PluginWorkspacePanelProps & { store: ZeroSubSt
       >
         {!state && error ? <Text style={text.danger}>Could not reach the daemon: {error}</Text> : null}
         {!state && !error ? <Text style={text.muted}>Loading accounts…</Text> : null}
-        {state && state.accounts.length === 0 && !antigravity ? (
+        {state && accounts.length === 0 && !antigravity ? (
           <Text style={text.muted}>No accounts yet.</Text>
         ) : null}
-        {state?.accounts.map((account) => (
+        {accounts.map((account) => (
           <AccountRow key={account.id} account={account} theme={theme} compact={layout.compact} />
         ))}
         {antigravity ? (

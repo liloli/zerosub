@@ -215,4 +215,117 @@ describe("explorer quota panel", () => {
 
     cleanup();
   });
+
+  it("groups accounts by family with ChatGPT accounts first and preserves within-family order", async () => {
+    const makeAccount = (id: string, family: "claude" | "codex", label: string): StateView["accounts"][number] => ({
+      id,
+      family,
+      label,
+      kind: "managed",
+      email: `${id}@example.com`,
+      plan: "pro",
+      organization: null,
+      status: "ready",
+      isDefault: false,
+      limitedUntil: null,
+      usage: null,
+      agentCount: 0,
+      home: null,
+    });
+
+    const state: StateView = {
+      accounts: [
+        makeAccount("chatgpt-alpha", "codex", "alpha-chatgpt"),
+        makeAccount("claude-one", "claude", "one-claude"),
+        makeAccount("chatgpt-beta", "codex", "beta-chatgpt"),
+        makeAccount("claude-two", "claude", "two-claude"),
+      ],
+      antigravity: {
+        status: "ok",
+        refreshing: false,
+        lastSuccessAt: "2026-11-01T11:55:00Z",
+        lastAttemptAt: "2026-11-01T11:55:00Z",
+        error: null,
+        groups: [
+          {
+            name: "Gemini Flash",
+            buckets: [
+              {
+                id: "flash-5h",
+                label: "5-hour",
+                window: "5h",
+                remainingPercent: 90,
+                resetsAt: null,
+              },
+            ],
+          },
+        ],
+      },
+      agents: [],
+      logins: [],
+      providers: { claude: "claude", codex: "codex" },
+      canReopen: true,
+      browserSignIn: true,
+      showComposerPill: false,
+      warnings: [],
+    };
+
+    const panels: PluginWorkspacePanelContribution[] = [];
+    const rpc = vi.fn().mockResolvedValue(state);
+    const client = {
+      rpc,
+      openSurface: vi.fn(),
+      addSurface: () => () => undefined,
+      addSidebarItem: () => () => undefined,
+      addWorkspacePanel: (panel: PluginWorkspacePanelContribution) => {
+        panels.push(panel);
+        return () => undefined;
+      },
+      addSettingsScreen: () => () => undefined,
+      addTimelineRenderer: () => () => undefined,
+      addCommandCenterItem: () => () => undefined,
+      addSlashCommand: () => () => undefined,
+      addComposerPill: () => ({ update: () => undefined, remove: () => undefined }),
+      paseo: {
+        agents: {
+          list: async () => ({
+            subscription: { subscribe: () => undefined },
+          }),
+        },
+      },
+    };
+
+    const cleanup = contribute(client as unknown as PluginClientContext);
+    await Promise.resolve();
+
+    const panel = panels[0]!;
+    if (panel.context !== "workspace") throw new Error("expected workspace panel");
+    const props: PluginWorkspacePanelProps = {
+      context: "workspace",
+      workspaceId: "ws-1",
+      theme: THEME,
+      host: { id: "local", label: "Local" },
+      layout: { compact: true, platform: "web" },
+    };
+
+    const output = renderText(createElement(panel.Component, props));
+    const posAlpha = output.indexOf("alpha-chatgpt");
+    const posBeta = output.indexOf("beta-chatgpt");
+    const posClaudeOne = output.indexOf("one-claude");
+    const posClaudeTwo = output.indexOf("two-claude");
+    const posAntigravity = output.indexOf("Antigravity");
+
+    expect(posAlpha).toBeGreaterThan(-1);
+    expect(posBeta).toBeGreaterThan(-1);
+    expect(posClaudeOne).toBeGreaterThan(-1);
+    expect(posClaudeTwo).toBeGreaterThan(-1);
+    expect(posAntigravity).toBeGreaterThan(-1);
+
+    expect(posAlpha).toBeLessThan(posBeta);
+    expect(posBeta).toBeLessThan(posClaudeOne);
+    expect(posClaudeOne).toBeLessThan(posClaudeTwo);
+    expect(posClaudeTwo).toBeLessThan(posAntigravity);
+
+    cleanup();
+  });
 });
