@@ -14,9 +14,10 @@ const MAX_OUTPUT_BYTES = 1024 * 1024;
 export function run(
   command: string,
   args: readonly string[],
-  options: { env?: NodeJS.ProcessEnv; timeoutMs?: number; input?: string; cwd?: string } = {},
+  options: { env?: NodeJS.ProcessEnv; timeoutMs?: number; maxOutputBytes?: number; input?: string; cwd?: string } = {},
 ): Promise<RunResult> {
   return new Promise((resolve) => {
+    const maxOutputBytes = options.maxOutputBytes ?? MAX_OUTPUT_BYTES;
     let stdout = "";
     let stderr = "";
     let timedOut = false;
@@ -48,12 +49,12 @@ export function run(
     }, options.timeoutMs ?? 30_000);
     const collect = (chunk: Buffer, stream: "stdout" | "stderr") => {
       if (outputExceeded) return;
-      const remaining = MAX_OUTPUT_BYTES - outputBytes;
+      const remaining = maxOutputBytes - outputBytes;
       const text = decoders[stream].write(chunk.subarray(0, remaining));
       if (stream === "stdout") stdout += text;
       else stderr += text;
       outputBytes += chunk.length;
-      if (outputBytes > MAX_OUTPUT_BYTES) {
+      if (outputBytes > maxOutputBytes) {
         outputExceeded = true;
         terminate();
       }
@@ -70,7 +71,10 @@ export function run(
       clearTimeout(killTimer);
       stdout += decoders.stdout.end();
       stderr += decoders.stderr.end();
-      if (outputExceeded) stderr = `Command output exceeded the 1 MiB limit.${stderr ? `\n${stderr}` : ""}`;
+      if (outputExceeded) {
+        const limitMib = Math.round(maxOutputBytes / (1024 * 1024)) || 1;
+        stderr = `Command output exceeded the ${limitMib} MiB limit.${stderr ? `\n${stderr}` : ""}`;
+      }
       resolve({ code: outputExceeded ? null : code, stdout, stderr, timedOut });
     });
     if (options.input !== undefined) child.stdin?.end(options.input);

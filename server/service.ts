@@ -1,4 +1,5 @@
 import type { AntigravityMonitor } from "./antigravity";
+import type { ModelUsageMonitor } from "./model-usage";
 import type { OpenCodeGoMonitor } from "./opencode-go";
 import { execFile } from "node:child_process";
 import { randomBytes } from "node:crypto";
@@ -214,6 +215,7 @@ export class Service {
     private readonly reopener = new Reopener(),
     private readonly antigravity?: AntigravityMonitor,
     private readonly opencodeGo?: OpenCodeGoMonitor,
+    private readonly modelUsage?: ModelUsageMonitor,
   ) {
     this.continuations = new CodexContinuations(store);
   }
@@ -230,6 +232,7 @@ export class Service {
   async start(): Promise<void> {
     void this.antigravity?.start();
     void this.opencodeGo?.start();
+    void this.modelUsage?.start();
     // The last readings show right away; fresh ones replace them as they arrive.
     for (const [accountId, reading] of await loadReadings()) if (!this.usage.has(accountId)) this.usage.set(accountId, reading);
     await Promise.all(FAMILIES.map((family) => this.ensureFamily(family)));
@@ -274,6 +277,7 @@ export class Service {
   private async tick(): Promise<void> {
     if (this.stopped) return;
     void this.opencodeGo?.refresh();
+    void this.modelUsage?.refresh();
     const now = Date.now();
     for (const family of FAMILIES) {
       const availability = this.availability.get(family);
@@ -1497,6 +1501,7 @@ export class Service {
     if (refreshUsage) {
       void this.antigravity?.refresh(true);
       void this.opencodeGo?.refresh(true);
+      void this.modelUsage?.refresh(true);
       const state = await this.store.read();
       await Promise.allSettled(state.accounts.map((account) => this.refreshUsage(account.id, true, true)));
     }
@@ -1554,6 +1559,7 @@ export class Service {
       accounts,
       antigravity: this.antigravity?.view(),
       opencodeGo: this.opencodeGo?.view(),
+      modelUsage: this.modelUsage?.view(),
       agents: routes,
       logins: [...this.logins.values()].map((login) => login.view),
       providers: families,

@@ -169,9 +169,87 @@ export const OpenCodeGoViewSchema = AntigravityViewSchema.omit({ groups: true })
 });
 export type OpenCodeGoView = z.infer<typeof OpenCodeGoViewSchema>;
 
+export const ModelPlatformSchema = z.enum(["claude", "codex", "opencode", "antigravity"]);
+export type ModelPlatform = z.infer<typeof ModelPlatformSchema>;
+
+export const ModelRoleSchema = z.enum(["commander", "coder", "grunt", "scout", "reviewer", "other"]);
+export type ModelRole = z.infer<typeof ModelRoleSchema>;
+
+export const TokenTotalsSchema = z.object({
+  inputTokens: z.number(),
+  outputTokens: z.number(),
+  cacheReadTokens: z.number(),
+  cacheWriteTokens: z.number(),
+  reasoningTokens: z.number(),
+  totalTokens: z.number(),
+  costUsd: z.number(),
+  cacheHitRate: z.number().min(0).max(1).nullable(),
+  sessionCount: z.number(),
+});
+export type TokenTotals = z.infer<typeof TokenTotalsSchema>;
+
+export const ModelUsageRowSchema = TokenTotalsSchema.extend({
+  platform: ModelPlatformSchema,
+  model: z.string(),
+  rawModels: z.array(z.string()),
+  unconfirmed: z.boolean(),
+  role: ModelRoleSchema,
+  missingPricing: z.boolean(),
+  tokenShare: z.number(),
+  platformTokenShare: z.number(),
+  costShare: z.number(),
+});
+export type ModelUsageRow = z.infer<typeof ModelUsageRowSchema>;
+
+export const PlatformUsageRowSchema = TokenTotalsSchema.extend({
+  platform: ModelPlatformSchema,
+  modelCount: z.number(),
+  tokenShare: z.number(),
+  costShare: z.number(),
+});
+export type PlatformUsageRow = z.infer<typeof PlatformUsageRowSchema>;
+
+export const RoleUsageRowSchema = TokenTotalsSchema.extend({
+  role: ModelRoleSchema,
+  tokenShare: z.number(),
+  costShare: z.number(),
+});
+export type RoleUsageRow = z.infer<typeof RoleUsageRowSchema>;
+
+export const DailyModelUsageSchema = TokenTotalsSchema.omit({ sessionCount: true }).extend({
+  platform: ModelPlatformSchema,
+  model: z.string(),
+  role: ModelRoleSchema,
+});
+export type DailyModelUsage = z.infer<typeof DailyModelUsageSchema>;
+
+export const DailyUsageRowSchema = TokenTotalsSchema.extend({
+  date: z.string(),
+  models: z.array(DailyModelUsageSchema),
+});
+export type DailyUsageRow = z.infer<typeof DailyUsageRowSchema>;
+
+export const ModelUsageSummarySchema = z.object({
+  since: z.string(),
+  until: z.string(),
+  totals: TokenTotalsSchema,
+  platforms: z.array(PlatformUsageRowSchema),
+  roles: z.array(RoleUsageRowSchema),
+  models: z.array(ModelUsageRowSchema),
+  daily: z.array(DailyUsageRowSchema),
+  limitations: z.array(z.string()),
+});
+export type ModelUsageSummary = z.infer<typeof ModelUsageSummarySchema>;
+
+export const ModelUsageViewSchema = AntigravityViewSchema.omit({ groups: true }).extend({
+  summary: ModelUsageSummarySchema.nullable(),
+});
+export type ModelUsageView = z.infer<typeof ModelUsageViewSchema>;
+
 export const StateViewSchema = z.object({
   antigravity: AntigravityViewSchema.optional(),
   opencodeGo: OpenCodeGoViewSchema.optional(),
+  modelUsage: ModelUsageViewSchema.optional(),
   accounts: z.array(AccountViewSchema),
   agents: z.array(AgentRouteSchema),
   logins: z.array(LoginViewSchema),

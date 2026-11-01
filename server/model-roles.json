@@ -1,0 +1,23 @@
+{
+  "aliases": {
+    "antigravity": {
+      "model_placeholder_m401": "AGY Opus",
+      "model_placeholder_m404": "AGY Sonnet"
+    }
+  },
+  "roles": [
+    { "platform": "claude", "match": "claude-opus", "role": "commander" },
+    { "platform": "claude", "match": "claude-sonnet", "role": "scout" },
+    { "platform": "claude", "match": "claude-haiku", "role": "scout" },
+    { "platform": "codex", "match": "gpt-6-astra", "role": "commander" },
+    { "platform": "codex", "match": "gpt-6.1-sol", "role": "coder" },
+    { "platform": "codex", "match": "luna", "role": "scout" },
+    { "platform": "opencode", "match": "deepseek", "role": "reviewer" },
+    { "platform": "antigravity", "match": "AGY Opus", "role": "reviewer" },
+    { "platform": "antigravity", "match": "claude-opus", "role": "reviewer" },
+    { "platform": "antigravity", "match": "AGY Sonnet", "role": "scout" },
+    { "platform": "antigravity", "match": "claude-sonnet", "role": "scout" },
+    { "platform": "antigravity", "match": "gemini-4-argon", "role": "coder" },
+    { "platform": "antigravity", "match": "gemini-3.8-flash", "role": "grunt" }
+  ]
+}
