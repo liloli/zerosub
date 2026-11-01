@@ -219,17 +219,17 @@ describe("explorer quota panel", () => {
     expect(rpc).toHaveBeenCalledTimes(1);
     expect(output).toContain("work-claude");
     expect(output).toContain("5-hour");
-    expect(output).toContain("34% used · resets in 2h");
+    expect(output).toContain("34% used · resets 22:00 (2h)");
     expect(output).toContain("Weekly");
-    expect(output).toContain("72% used · resets in 2d");
+    expect(output).toContain("72% used · resets 11-03 20:00 (2d)");
     expect(output).toContain("Antigravity");
     expect(output).toContain("Gemini Pro");
-    expect(output).toContain("80% left · Resets in 4h");
+    expect(output).toContain("80% left · Resets 11-02 00:00 (4h)");
     expect(output.indexOf("OpenCode Go")).toBeGreaterThan(output.indexOf("Antigravity"));
-    expect(output).toContain("0% used · resets in 2h");
-    expect(output).toContain("40% used · resets in 2d");
+    expect(output).toContain("0% used · resets 22:00 (2h)");
+    expect(output).toContain("40% used · resets 11-03 20:00 (2d)");
     expect(output).toContain("Monthly");
-    expect(output).toContain("49% used · resets in 7d");
+    expect(output).toContain("49% used · resets 11-08 20:00 (7d)");
 
     const { AccountsSurface } = await import("./accounts-surface");
     const { createZeroSubStore } = await import("./store");
@@ -238,7 +238,7 @@ describe("explorer quota panel", () => {
     const accountsProps = { ...props, store } as unknown as Parameters<typeof AccountsSurface>[0];
     const accountsOutput = renderText(createElement(AccountsSurface, accountsProps));
     expect(accountsOutput.indexOf("OpenCode Go")).toBeGreaterThan(accountsOutput.indexOf("Antigravity"));
-    expect(accountsOutput).toContain("49% used · resets in 7d");
+    expect(accountsOutput).toContain("49% used · resets 11-08 20:00 (7d)");
     state.opencodeGo = { ...state.opencodeGo, status: "error", error: "OpenCode Go usage failed (HTTP 401)." };
     await store.refresh();
     expect(renderText(createElement(AccountsSurface, accountsProps))).toContain("OpenCode Go usage failed (HTTP 401).");
@@ -364,5 +364,15 @@ describe("explorer quota panel", () => {
     expect(posClaudeTwo).toBeLessThan(posAntigravity);
 
     cleanup();
+  });
+
+  it("assigns distinct theme-based tints to ChatGPT, Claude, Antigravity, and OpenCode Go", async () => {
+    const { platformTint } = await import("./quota-panel");
+    const { OPENCODE_GO_TINT } = await import("./opencode-go-card");
+
+    expect(platformTint("codex", THEME)).toBe(THEME.colors.statusSuccess);
+    expect(platformTint("claude", THEME)).toBe(THEME.colors.statusWarning);
+    expect(platformTint("antigravity", THEME)).toBe(THEME.colors.accent);
+    expect(platformTint("opencodeGo", THEME)).toBe(OPENCODE_GO_TINT);
   });
 });

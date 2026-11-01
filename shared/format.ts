@@ -1,21 +1,52 @@
 import type { AccountView, Credits, UsageWindow } from "./model";
 
-/** "in 2h 14m", "in 3d 4h", "now". */
+const BEIJING_OFFSET_MS = 8 * 3600_000;
+
+function formatCountdown(minutes: number): string {
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) {
+    const rest = minutes % 60;
+    return rest === 0 ? `${hours}h` : `${hours}h ${rest}m`;
+  }
+  const days = Math.floor(hours / 24);
+  const restHours = hours % 24;
+  return restHours === 0 ? `${days}d` : `${days}d ${restHours}h`;
+}
+
+/**
+ * Reset time in Beijing time (Asia/Shanghai, UTC+8) plus countdown:
+ * - Same day (Beijing date): "21:40 (4h 26m)"
+ * - Other day: "11-02 08:00 (15h)"
+ * - Expired / now: "now"
+ */
 export function formatResetIn(resetsAt: string | null, now: number = Date.now()): string | null {
   if (!resetsAt) return null;
   const at = Date.parse(resetsAt);
   if (!Number.isFinite(at)) return null;
   const minutes = Math.round((at - now) / 60_000);
   if (minutes <= 0) return "now";
-  if (minutes < 60) return `in ${minutes}m`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) {
-    const rest = minutes % 60;
-    return rest === 0 ? `in ${hours}h` : `in ${hours}h ${rest}m`;
+
+  const countdown = formatCountdown(minutes);
+  const beijingAt = new Date(at + BEIJING_OFFSET_MS);
+  const beijingNow = new Date(now + BEIJING_OFFSET_MS);
+
+  const isSameDay =
+    beijingAt.getUTCFullYear() === beijingNow.getUTCFullYear() &&
+    beijingAt.getUTCMonth() === beijingNow.getUTCMonth() &&
+    beijingAt.getUTCDate() === beijingNow.getUTCDate();
+
+  const hours = String(beijingAt.getUTCHours()).padStart(2, "0");
+  const mins = String(beijingAt.getUTCMinutes()).padStart(2, "0");
+  const timeStr = `${hours}:${mins}`;
+
+  if (isSameDay) {
+    return `${timeStr} (${countdown})`;
   }
-  const days = Math.floor(hours / 24);
-  const restHours = hours % 24;
-  return restHours === 0 ? `in ${days}d` : `in ${days}d ${restHours}h`;
+
+  const month = String(beijingAt.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(beijingAt.getUTCDate()).padStart(2, "0");
+  return `${month}-${day} ${timeStr} (${countdown})`;
 }
 
 export function formatPercent(value: number): string {

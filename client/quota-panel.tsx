@@ -4,9 +4,27 @@ import { formatAge, formatCredits, usageSummary } from "../shared/format";
 import { FAMILY_LABEL, type AccountView, type AntigravityView, type Family } from "../shared/model";
 import { useStore, type ZeroSubStore } from "./store";
 import { Badge, RemainingBar, UsageBar, useText } from "./ui";
-import { OpenCodeGoCard } from "./opencode-go-card";
+import { OPENCODE_GO_TINT, OpenCodeGoCard } from "./opencode-go-card";
 
 type Theme = PluginWorkspacePanelProps["theme"];
+
+export function platformTint(
+  platform: Family | "antigravity" | "opencodeGo" | string,
+  theme: Theme,
+): string {
+  switch (platform) {
+    case "codex":
+      return theme.colors.statusSuccess;
+    case "claude":
+      return theme.colors.statusWarning;
+    case "antigravity":
+      return theme.colors.accent;
+    case "opencodeGo":
+      return OPENCODE_GO_TINT;
+    default:
+      return theme.colors.accent;
+  }
+}
 
 const FAMILIES: readonly Family[] = ["codex", "claude"];
 
@@ -55,7 +73,7 @@ export function QuotaPanel(props: PluginWorkspacePanelProps & { store: ZeroSubSt
         {antigravity ? (
           <AntigravitySection usage={antigravity} theme={theme} compact={layout.compact} />
         ) : null}
-        {opencodeGo ? <OpenCodeGoCard theme={theme} usage={opencodeGo} /> : null}
+        {opencodeGo ? <OpenCodeGoCard theme={theme} usage={opencodeGo} compact={layout.compact} /> : null}
       </ScrollView>
     </View>
   );
@@ -80,14 +98,28 @@ function AccountRow({
   return (
     <View
       style={{
+        position: "relative",
         padding: compact ? 10 : 12,
         gap: compact ? 6 : 8,
         borderRadius: 10,
         borderWidth: 1,
         borderColor: theme.colors.border,
         backgroundColor: theme.colors.surface1,
+        overflow: "hidden",
       }}
     >
+      <View
+        pointerEvents="none"
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: platformTint(account.family, theme),
+          opacity: 0.06,
+        }}
+      />
       <View
         style={[
           { flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 6 },
@@ -137,14 +169,28 @@ function AntigravitySection({
   return (
     <View
       style={{
+        position: "relative",
         padding: compact ? 10 : 12,
         gap: compact ? 6 : 8,
         borderRadius: 10,
         borderWidth: 1,
         borderColor: theme.colors.border,
         backgroundColor: theme.colors.surface1,
+        overflow: "hidden",
       }}
     >
+      <View
+        pointerEvents="none"
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: platformTint("antigravity", theme),
+          opacity: 0.06,
+        }}
+      />
       <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "baseline", justifyContent: "space-between", gap: 6 }}>
         <Text style={text.strong}>Antigravity</Text>
         <Text style={text.small}>
