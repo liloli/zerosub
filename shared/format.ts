@@ -1,6 +1,6 @@
 import type { AccountView, Credits, UsageWindow } from "./model";
 
-const BEIJING_OFFSET_MS = 8 * 3600_000;
+const DISPLAY_OFFSET_MS = 8 * 3600_000;
 
 function formatCountdown(minutes: number): string {
   if (minutes < 60) return `${minutes}m`;
@@ -15,8 +15,8 @@ function formatCountdown(minutes: number): string {
 }
 
 /**
- * Reset time in Beijing time (Asia/Shanghai, UTC+8) plus countdown:
- * - Same day (Beijing date): "21:40  4h 26m"
+ * Reset time in UTC+8 plus countdown:
+ * - Same day (UTC+8 date): "21:40  4h 26m"
  * - Other day: "11-02 08:00  15h"
  * - Expired / now: "now"
  */
@@ -28,24 +28,24 @@ export function formatResetIn(resetsAt: string | null, now: number = Date.now())
   if (minutes <= 0) return "now";
 
   const countdown = formatCountdown(minutes);
-  const beijingAt = new Date(at + BEIJING_OFFSET_MS);
-  const beijingNow = new Date(now + BEIJING_OFFSET_MS);
+  const displayAt = new Date(at + DISPLAY_OFFSET_MS);
+  const displayNow = new Date(now + DISPLAY_OFFSET_MS);
 
   const isSameDay =
-    beijingAt.getUTCFullYear() === beijingNow.getUTCFullYear() &&
-    beijingAt.getUTCMonth() === beijingNow.getUTCMonth() &&
-    beijingAt.getUTCDate() === beijingNow.getUTCDate();
+    displayAt.getUTCFullYear() === displayNow.getUTCFullYear() &&
+    displayAt.getUTCMonth() === displayNow.getUTCMonth() &&
+    displayAt.getUTCDate() === displayNow.getUTCDate();
 
-  const hours = String(beijingAt.getUTCHours()).padStart(2, "0");
-  const mins = String(beijingAt.getUTCMinutes()).padStart(2, "0");
+  const hours = String(displayAt.getUTCHours()).padStart(2, "0");
+  const mins = String(displayAt.getUTCMinutes()).padStart(2, "0");
   const timeStr = `${hours}:${mins}`;
 
   if (isSameDay) {
     return `${timeStr}  ${countdown}`;
   }
 
-  const month = String(beijingAt.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(beijingAt.getUTCDate()).padStart(2, "0");
+  const month = String(displayAt.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(displayAt.getUTCDate()).padStart(2, "0");
   return `${month}-${day} ${timeStr}  ${countdown}`;
 }
 
