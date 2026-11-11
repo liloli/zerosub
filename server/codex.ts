@@ -518,6 +518,11 @@ export function parseResetCredits(summary: unknown): ResetOffer | null {
   const title = usable.map((credit) => credit.title).find((value): value is string => typeof value === "string" && value.trim() !== "");
   return {
     available,
+    grants: usable.map((credit) => ({
+      label: typeof credit.title === "string" && credit.title.trim() ? credit.title : "Reset",
+      available: 1,
+      expiresAt: typeof credit.expiresAt === "number" ? new Date(credit.expiresAt * 1000).toISOString() : null,
+    })).sort((a, b) => (a.expiresAt ?? "9999").localeCompare(b.expiresAt ?? "9999")),
     // Codex decides at redeem time (it answers "nothing to reset" when the limits aren't used up).
     usableNow: true,
     blockedReason: null,

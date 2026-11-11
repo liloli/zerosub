@@ -89,9 +89,16 @@ describe("Codex reset credits", () => {
       credits: [
         { id: "a", resetType: "codexRateLimits", status: "available", grantedAt: 1, expiresAt: 1790500000, title: "Weekly reset", description: null },
         { id: "b", resetType: "codexRateLimits", status: "available", grantedAt: 1, expiresAt: 1790300000, title: null, description: null },
-        { id: "c", resetType: "codexRateLimits", status: "redeemed", grantedAt: 1, expiresAt: 1790000000, title: null, description: null },
+        { id: "c", resetType: "codexRateLimits", status: "used", grantedAt: 1, expiresAt: 1790000000, title: null, description: null },
       ],
     });
+    expect(offer?.grants).toEqual([
+      { label: "Reset", available: 1, expiresAt: new Date(1790300000 * 1000).toISOString() },
+      { label: "Weekly reset", available: 1, expiresAt: new Date(1790500000 * 1000).toISOString() },
+    ]);
+    expect(parseResetCredits({ availableCount: 1, credits: [
+      { status: "expired", expiresAt: 1 }, { status: "available" },
+    ] })?.grants).toEqual([{ label: "Reset", available: 1, expiresAt: null }]);
     expect(offer).toMatchObject({ available: 2, usableNow: true, label: "Weekly reset", expiresAt: new Date(1790300000 * 1000).toISOString() });
     expect(parseResetCredits({ availableCount: 0, credits: null })).toBeNull();
     expect(parseResetCredits(null)).toBeNull();

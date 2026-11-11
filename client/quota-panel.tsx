@@ -86,7 +86,9 @@ function AccountRow({
         const hint = `${label} ×${grant.available} · ${grant.expiresAt ? `Expires ${formatResetIn(grant.expiresAt)}` : "Expiration unknown"}`;
         return Array.from({ length: grant.available }, () => hint);
       }) ?? []
-    : Array.from({ length: resets?.available ?? 0 }, () => expiry ? `Expires ${expiry}` : "Expiration unknown");
+    : resets?.grants?.length
+      ? resets.grants.flatMap(grant => Array.from({ length: grant.available }, () => grant.expiresAt ? `Expires ${formatResetIn(grant.expiresAt)}` : "Expiration unknown"))
+      : Array.from({ length: resets?.available ?? 0 }, () => expiry ? `Expires ${expiry}` : "Expiration unknown");
 
   return (
     <View
