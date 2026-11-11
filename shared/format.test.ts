@@ -110,7 +110,7 @@ describe("account presentation", () => {
 
   it("puts a reached limit first", () => {
     expect(usageSummary({ ...account, status: "limited", limitedUntil: "2026-09-23T13:30:00Z" }, NOW)).toBe(
-      "Limit reached · 21:30  1h 30m",
+      "21:30  1h 30m",
     );
   });
 

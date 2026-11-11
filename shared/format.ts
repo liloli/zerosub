@@ -130,8 +130,7 @@ export function formatAge(at: string, now: number = Date.now()): string {
 export function usageSummary(account: AccountView, now: number = Date.now()): string | null {
   if (account.status === "disabled") return "Disabled for now";
   if (account.status === "limited") {
-    const reset = formatResetIn(account.limitedUntil, now);
-    return reset ? `Limit reached · ${reset}` : "Limit reached";
+    return formatResetIn(account.limitedUntil, now);
   }
   const peak = account.usage ? peakUsage(account.usage.windows) : null;
   if (!peak) return null;

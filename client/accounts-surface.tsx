@@ -393,7 +393,6 @@ function AccountCard({
         {disabled ? <Badge theme={theme} label="Disabled" /> : null}
         {plan ? <Badge theme={theme} label={plan} /> : null}
         {account.kind === "main" ? <Badge theme={theme} label="CLI login" /> : null}
-        {account.status === "limited" ? <Badge theme={theme} label="Limit reached" tone="danger" /> : null}
         {account.status === "signed_out" ? <Badge theme={theme} label="Signed out" tone="warning" /> : null}
         {resets && !signedOut ? <Badge theme={theme} label={resetBadge(resets)} tone="accent" /> : null}
       </View>

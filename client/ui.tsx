@@ -153,6 +153,18 @@ export function Button({
   );
 }
 
+export function TicketIcon({ theme, hint }: { theme: Theme; hint: string }) {
+  const tip = useTooltip(hint);
+  return (
+    <View style={{ position: "relative", zIndex: tip.visible ? 1000 : undefined }}>
+      <Pressable accessibilityLabel={hint} {...tip.handlers}>
+        <Text>🎟️</Text>
+      </Pressable>
+      {tip.visible ? <TooltipBubble theme={theme} text={hint} placement="bottom" align="end" /> : null}
+    </View>
+  );
+}
+
 export function IconButton({
   theme,
   icon,

@@ -1,12 +1,12 @@
 import type { PluginWorkspacePanelProps } from "@getpaseo/plugin/client";
 import { ScrollView, Text, View } from "react-native";
-import { formatAge, formatCredits, usageSummary } from "../shared/format";
+import { formatAge, formatCredits, formatResetIn, usageSummary } from "../shared/format";
 import type { AccountView, AntigravityView, Family } from "../shared/model";
 import { OpenCodeGoCard } from "./opencode-go-card";
 import { PlatformIcon } from "./platform-icon";
 import { displayGroupName, orderAntigravityBuckets, orderUsageWindows } from "./quota-display";
 import { useStore, type ZeroSubStore } from "./store";
-import { Badge, RemainingBar, UsageBar, useText } from "./ui";
+import { Badge, RemainingBar, TicketIcon, UsageBar, useText } from "./ui";
 
 type Theme = PluginWorkspacePanelProps["theme"];
 
@@ -78,6 +78,9 @@ function AccountRow({
   const faded = disabled ? { opacity: 0.55 } : null;
   const limits = account.usage?.windows ?? [];
   const credits = account.usage?.credits ?? null;
+  const resets = account.usage?.resets;
+  const expiry = formatResetIn(resets?.expiresAt ?? null);
+  const ticketHint = expiry ? `Expires ${expiry}` : "Expiration unknown";
 
   return (
     <View
@@ -109,7 +112,9 @@ function AccountRow({
             <Text style={text.small}>Not loaded yet</Text>
           ) : null}
           {account.isDefault ? <Text accessibilityLabel="Default">🟢</Text> : null}
-          {account.status === "limited" ? <Badge theme={theme} label="Limit reached" tone="danger" /> : null}
+          {Array.from({ length: resets?.available ?? 0 }, (_, index) => (
+            <TicketIcon key={index} theme={theme} hint={ticketHint} />
+          ))}
           {disabled ? <Badge theme={theme} label="Disabled" /> : null}
           {signedOut ? <Badge theme={theme} label="Signed out" tone="warning" /> : null}
         </View>
