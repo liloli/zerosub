@@ -72,7 +72,7 @@ function TooltipBubble({
   return (
     <View pointerEvents="none" style={{ position: "absolute", width: TOOLTIP_WIDTH, zIndex: 1000, ...vertical, ...horizontal }}>
       <View style={{ paddingHorizontal: 8, paddingVertical: 5, borderRadius: 6, backgroundColor: theme.colors.foreground }}>
-        <Text style={{ color: theme.colors.surface0, fontSize: 12, lineHeight: 16 }}>{text}</Text>
+        <Text style={{ color: theme.colors.surface0, fontSize: 12, lineHeight: 16, fontWeight: "600" }}>{text}</Text>
       </View>
     </View>
   );

@@ -80,7 +80,13 @@ function AccountRow({
   const credits = account.usage?.credits ?? null;
   const resets = account.usage?.resets;
   const expiry = formatResetIn(resets?.expiresAt ?? null);
-  const ticketHint = account.family === "claude" ? (resets?.grants?.map(grant => `${grant.label}: ${grant.available} left · ${grant.expiresAt ? `Expires ${formatResetIn(grant.expiresAt)}` : "Expiration unknown"}`).join("\n") || "Reset credits unknown") : expiry ? `Expires ${expiry}` : "Expiration unknown";
+  const ticketHints = account.family === "claude"
+    ? resets?.grants?.flatMap(grant => {
+        const label = grant.label.includes("Fable") ? "Fable reset" : grant.label.toLowerCase().includes("full") ? "Full reset" : grant.label;
+        const hint = `${label} ×${grant.available} · ${grant.expiresAt ? `Expires ${formatResetIn(grant.expiresAt)}` : "Expiration unknown"}`;
+        return Array.from({ length: grant.available }, () => hint);
+      }) ?? []
+    : Array.from({ length: resets?.available ?? 0 }, () => expiry ? `Expires ${expiry}` : "Expiration unknown");
 
   return (
     <View
@@ -95,7 +101,7 @@ function AccountRow({
     >
       <View
         style={[
-          { flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 6 },
+          { flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 6, zIndex: 1 },
           faded,
         ]}
       >
@@ -113,8 +119,8 @@ function AccountRow({
           ) : null}
           {account.isDefault ? <Text accessibilityLabel="Default">🟢</Text> : null}
           {account.family === "claude" && !resets ? <TicketIcon theme={theme} hint="Reset credits unknown" /> : null}
-          {Array.from({ length: resets?.available ?? 0 }, (_, index) => (
-            <TicketIcon key={index} theme={theme} hint={ticketHint} />
+          {ticketHints.map((hint, index) => (
+            <TicketIcon key={index} theme={theme} hint={hint} />
           ))}
           {disabled ? <Badge theme={theme} label="Disabled" /> : null}
           {signedOut ? <Badge theme={theme} label="Signed out" tone="warning" /> : null}
