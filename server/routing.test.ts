@@ -249,6 +249,22 @@ describe("non-portable conversations (Codex)", () => {
     expect(chooseAccount(state, { ...codex, reason: "resume", usageOf: () => null })?.account.id).toBe("codex-main");
   });
 
+  it("gives an existing thread ZeroSub never routed to the CLI login, whatever the default", () => {
+    const state = stateWith([main, work], { defaults: { claude: null, codex: "codex-work" } });
+    for (const reason of ["resume", "refresh", "import"] as const) {
+      const decision = chooseAccount(state, { ...codex, reason, usageOf: () => null });
+      expect(decision?.account.id).toBe("codex-main");
+      expect(decision?.bind).toMatchObject({ accountId: "codex-main", source: "thread" });
+    }
+    // A brand-new agent, and a thread ZeroSub opened before (it has a session record), follow the default.
+    expect(chooseAccount(state, { ...codex, reason: "create", usageOf: () => null })?.account.id).toBe("codex-work");
+    const routed = stateWith([main, work], {
+      defaults: { claude: null, codex: "codex-work" },
+      sessions: { "agent-1": { accountId: "codex-work", family: "codex", openedAt: "x" } },
+    });
+    expect(chooseAccount(routed, { ...codex, reason: "resume", usageOf: () => null })?.account.id).toBe("codex-work");
+  });
+
   it("starts new agents on a usable account", () => {
     const limited = account({ id: "codex-main", family: "codex", kind: "main", home: null, limitedUntil: "2026-09-23T14:00:00Z" });
     const decision = chooseAccount(stateWith([limited, work]), { ...codex, reason: "create", usageOf: () => null });
@@ -316,5 +332,19 @@ describe("disabled accounts", () => {
     const state = stateWith([main, account({ id: "claude-work", ...off })]);
     const usageOf = (id: string) => usage(id === "claude-main" ? 90 : 5);
     expect(mostAvailable(state, "claude", usageOf, NOW)?.id).toBe("claude-main");
+  });
+});
+
+describe("headroom", () => {
+  it("ranks by the windows that cap the whole account, not one model's", async () => {
+    const { headroomScore } = await import("./routing");
+    const reading = (windows: Usage["windows"]): Usage => ({ fetchedAt: "", windows, error: null, cached: false, resets: null, credits: null });
+    const opusFull = reading([
+      { id: "five_hour", label: "5-hour", usedPercent: 10, resetsAt: null },
+      { id: "seven_day_opus", label: "Weekly · Opus", usedPercent: 100, resetsAt: null },
+    ]);
+    expect(headroomScore(opusFull)).toBe(10);
+    expect(headroomScore(reading([{ id: "primary", label: "5h", usedPercent: 70, resetsAt: null }]))).toBe(70);
+    expect(headroomScore(null)).toBe(50);
   });
 });

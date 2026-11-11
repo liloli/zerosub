@@ -656,6 +656,24 @@ describe("usage readings", () => {
     return (await store.read()).sessions[NEW_AGENT]?.accountId;
   };
 
+  it("doesn't take one model's full window for the whole account's limit", async () => {
+    const opusFull = (): UsageRead => ({
+      fetchedAt: new Date().toISOString(),
+      windows: [
+        { id: "five_hour", label: "5-hour", usedPercent: 12, resetsAt: inFuture() },
+        { id: "seven_day", label: "Weekly", usedPercent: 40, resetsAt: inFuture() },
+        { id: "seven_day_opus", label: "Weekly · Opus", usedPercent: 100, resetsAt: inFuture() },
+      ],
+      error: null,
+      cached: false,
+      resets: null,
+    });
+    const { service, store, paseo } = await setUp(state(), unused, { usage: opusFull });
+    await service.refreshUsage(MAIN, true);
+    expect(await limitedUntil(store)).toBeNull();
+    expect(await newAgentOpensOn(service, store, paseo)).toBe(MAIN);
+  });
+
   it("takes a full window without credits for a limit, whatever the setting", async () => {
     for (const prefs of [preferences.schema.parse({}), USE_CREDITS]) {
       const { service, store } = await setUp(state(), unused, { usage: full(null) });
@@ -819,6 +837,23 @@ describe("changing the default account", () => {
     service.setPreferences(KEEP);
     return { service, store, paseo: paseo as never, context, reopened };
   }
+
+  it("moves an agent whose last turn failed when it's switched", async () => {
+    // A failed turn leaves the agent in "error" with its session still open: its next message goes to
+    // that session as it is, so only a reload moves it.
+    const { service, store, paseo, reopened } = await setUpAgents(
+      {
+        accounts: [account(MAIN, "marketing", "main"), account(WORK, "work", "managed")] as never,
+        defaults: { claude: MAIN, codex: null },
+        sessions: { failed: session(MAIN) },
+      },
+      [{ id: "failed", status: "error" }],
+    );
+    const summary = await service.setAgentAccount(paseo, "failed", WORK);
+    expect(summary.reopened).toEqual(["failed"]);
+    expect(reopened).toEqual(["failed"]);
+    expect((await store.read()).sessions.failed?.accountId).toBe(WORK);
+  });
 
   it("keeps each open agent that follows the default on the account it runs on, and nothing else", async () => {
     const { service, store, paseo, reopened } = await setUpAgents(

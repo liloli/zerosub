@@ -1,4 +1,4 @@
-import { peakUsage } from "../shared/format";
+import { accountPeak } from "../shared/format";
 import type { Family, Usage } from "../shared/model";
 import { FIVE_HOUR_MINUTES, WEEK_MINUTES } from "./codex";
 import {
@@ -28,9 +28,12 @@ export function isUsable(account: StoredAccount, now: number): boolean {
   return account.signedIn && !account.disabled && !isLimited(account, now);
 }
 
-/** Lower is better. Unknown usage ranks in the middle so a known-quiet account wins over a mystery. */
+/**
+ * Lower is better. Unknown usage ranks in the middle so a known-quiet account wins over a mystery.
+ * A full window of one model only, such as "Weekly · Opus", leaves the account its room for the rest.
+ */
 export function headroomScore(usage: Usage | null | undefined): number {
-  const peak = usage ? peakUsage(usage.windows) : null;
+  const peak = usage ? accountPeak(usage.windows) : null;
   return peak ? peak.usedPercent : 50;
 }
 
@@ -133,9 +136,11 @@ export function chooseAccount(state: StoredState, input: RouteInput): RouteDecis
     if (account) bind = { accountId: account.id, source: "balance", at, selectionReason: nearReset ? "weekly_reset" : "headroom" };
   }
   if (!account) {
-    // An imported Codex thread most likely came from the user's own CLI, so it belongs to that login.
-    const imported = !input.portable && input.reason === "import" ? mainAccount(state, input.family) : undefined;
-    account = imported ?? defaultAccount(state, input.family);
+    // An existing Codex thread ZeroSub never routed (imported from the user's own CLI, or started
+    // while ZeroSub was off) ran on the CLI login, so it belongs to that login: on any other account
+    // its encrypted reasoning can't be read. Only a brand-new agent follows the default.
+    const unrouted = !input.portable && !fresh && !state.sessions[input.agentId] ? mainAccount(state, input.family) : undefined;
+    account = unrouted ?? defaultAccount(state, input.family);
     // A thread that can't move is pinned to the account it first opened on.
     if (account && !input.portable) bind = { accountId: account.id, source: "thread", at };
   }
