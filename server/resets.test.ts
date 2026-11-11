@@ -28,6 +28,7 @@ describe("Claude banked resets", () => {
     expect(nextGrantId).toBe("grant_1");
     expect(offer).toEqual({
       available: 2,
+      grants: [{ label: "Limit reset", available: 2, expiresAt: "2026-09-30T00:00:00.000Z" }],
       usableNow: true,
       blockedReason: null,
       expiresAt: "2026-09-30T00:00:00.000Z",

@@ -129,6 +129,7 @@ export function parseClaudeResets(block: unknown, now: number = Date.now()): Cla
     atLimit,
     offer: {
       available,
+      grants: eligible ? grants.map(grant => ({ label: grant.label, available: grant.resetsLeft, expiresAt: grant.endsAt })) : undefined,
       usableNow: blockedReason === null,
       blockedReason,
       expiresAt: next?.endsAt ?? null,

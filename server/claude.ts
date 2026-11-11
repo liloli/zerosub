@@ -24,9 +24,14 @@ import { retryDelayMs } from "./usage";
 
 const API = "https://api.anthropic.com";
 
-function apiHeaders(token: string): Record<string, string> {
+let cliVersion: Promise<string> | undefined;
+
+export async function apiHeaders(token: string): Promise<Record<string, string>> {
+  cliVersion ??= run("claude", ["--version"], { timeoutMs: 3000 }).then(result => result.stdout.match(/\d+\.\d+\.\d+/)?.[0] ?? "2.1.76");
+  const version = await cliVersion;
   return {
     Authorization: `Bearer ${token}`,
+    "User-Agent": `claude-cli/${version} (external, cli)`,
     "anthropic-beta": "oauth-2025-04-20",
     Accept: "application/json",
     "Content-Type": "application/json",
@@ -114,7 +119,7 @@ export class ClaudeAdapter implements FamilyAdapter {
       try {
         // The `cedar_ember` read is the one Claude Code's /limit-reset makes: usage plus banked resets.
         const response = await fetch(`${API}/api/oauth/usage?cedar_ember=1&skip_spend=1`, {
-          headers: apiHeaders(credentials.accessToken),
+          headers: await apiHeaders(credentials.accessToken),
           signal: AbortSignal.timeout(15_000),
         });
         if (response.ok) {
@@ -188,7 +193,7 @@ export class ClaudeAdapter implements FamilyAdapter {
     let status: ReturnType<typeof parseClaudeResets>;
     try {
       const response = await fetch(`${API}/api/oauth/usage?cedar_ember=1&skip_spend=1`, {
-        headers: apiHeaders(token),
+        headers: await apiHeaders(token),
         signal: AbortSignal.timeout(15_000),
       });
       if (!response.ok) return statusFailure(response.status);
@@ -214,7 +219,7 @@ export class ClaudeAdapter implements FamilyAdapter {
     try {
       const response = await fetch(`${API}/api/organizations/${organization}/reset_rate_limits`, {
         method: "POST",
-        headers: apiHeaders(token),
+        headers: await apiHeaders(token),
         body: JSON.stringify({ program: CLAUDE_RESET_PROGRAM, grant_id: status.nextGrantId, request_id: randomUUID() }),
         signal: AbortSignal.timeout(25_000),
       });

@@ -80,7 +80,7 @@ function AccountRow({
   const credits = account.usage?.credits ?? null;
   const resets = account.usage?.resets;
   const expiry = formatResetIn(resets?.expiresAt ?? null);
-  const ticketHint = expiry ? `Expires ${expiry}` : "Expiration unknown";
+  const ticketHint = account.family === "claude" ? (resets?.grants?.map(grant => `${grant.label}: ${grant.available} left · ${grant.expiresAt ? `Expires ${formatResetIn(grant.expiresAt)}` : "Expiration unknown"}`).join("\n") || "Reset credits unknown") : expiry ? `Expires ${expiry}` : "Expiration unknown";
 
   return (
     <View
@@ -112,6 +112,7 @@ function AccountRow({
             <Text style={text.small}>Not loaded yet</Text>
           ) : null}
           {account.isDefault ? <Text accessibilityLabel="Default">🟢</Text> : null}
+          {account.family === "claude" && !resets ? <TicketIcon theme={theme} hint="Reset credits unknown" /> : null}
           {Array.from({ length: resets?.available ?? 0 }, (_, index) => (
             <TicketIcon key={index} theme={theme} hint={ticketHint} />
           ))}

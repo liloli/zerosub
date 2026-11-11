@@ -25,6 +25,7 @@ export type UsageWindow = z.infer<typeof UsageWindowSchema>;
 export const ResetOfferSchema = z.object({
   /** Resets left to use. */
   available: z.number(),
+  grants: z.array(z.object({ label: z.string(), available: z.number(), expiresAt: z.string().nullable() })).optional(),
   /** The provider will accept a redeem right now. */
   usableNow: z.boolean(),
   /** Why it can't be used yet, in plain words, when it can't. */
