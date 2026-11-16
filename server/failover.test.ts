@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -532,7 +532,7 @@ describe("forking to the other provider", () => {
         { agent: { id: AGENT, provider: "claude" }, turnId: "t", outcome: { kind: "failed", error: { message: "limit" } }, timeline: [] } as never,
         context,
       );
-    return { store, created, notes, limitTurn };
+    return { store, created, notes, limitTurn, service, paseo };
   }
 
   it("carries the work on with the other provider, at the same permission level", async () => {
@@ -591,6 +591,52 @@ describe("forking to the other provider", () => {
     expect(prompt.match(/User: Fix the build/g) ?? []).toHaveLength(1);
     expect(prompt).toContain("Step 45 done.");
     expect(prompt).toContain("User: Now run the linter");
+  });
+
+  it("skips auto cross-provider fork for worker sessions", async () => {
+    const { created, notes, limitTurn } = await setUpFork("bypassPermissions", [], { "wf-role": "worker" });
+    await limitTurn();
+    expect(created).toHaveLength(0);
+    expect(notes.at(-1)).toMatchObject({ outcome: "stayed" });
+    expect(notes.at(-1)?.detail).toBe("Sessions labelled as workers or reviewers do not continue on the other provider automatically; their coordinator decides.");
+  });
+
+  it("hands over automatically for control sessions", async () => {
+    await mkdir(join(root, "zerosub"), { recursive: true });
+    await writeFile(
+      join(root, "zerosub", "commander-handover.json"),
+      JSON.stringify({ command: "/bin/true", models: { claude: "c-model", codex: "x-model" }, titlePrefix: "[next] " }),
+    );
+    const { service, store, notes, limitTurn } = await setUpFork("bypassPermissions", [], { "wf-role": "control" });
+    vi.spyOn(service as any, "continueCommander").mockImplementation(async () => {
+      await store.update((draft) => {
+        draft.bindings["control-successor"] = { accountId: CODEX_MAIN, source: "auto", at: new Date().toISOString() };
+      });
+      return { agentId: "control-successor", title: "[next] Fix the build" };
+    });
+    await limitTurn();
+    expect(notes.at(-1)).toMatchObject({
+      outcome: "continued",
+      toFamily: "codex",
+      continuedIn: { agentId: "control-successor" },
+    });
+  });
+
+  it("carries work across providers automatically when session has no wf-role tag", async () => {
+    const { created, notes, limitTurn } = await setUpFork("bypassPermissions", [], {});
+    await limitTurn();
+    expect(created).toHaveLength(1);
+    expect(created[0]?.title).toBe("Fix the build (continued on ChatGPT)");
+    expect(notes.at(-1)).toMatchObject({ outcome: "continued", toFamily: "codex" });
+  });
+
+  it("allows manual cross-provider fork for worker sessions", async () => {
+    const { service, paseo, created, notes } = await setUpFork("bypassPermissions", [], { "wf-role": "worker" });
+    const continuation = await service.forkAgent(paseo as never, AGENT);
+    expect(continuation.agentId).toBeDefined();
+    expect(created).toHaveLength(1);
+    expect(created[0]?.title).toBe("Fix the build (continued on ChatGPT)");
+    expect(notes.at(-1)).toMatchObject({ outcome: "continued", reason: "manual", toFamily: "codex" });
   });
 });
 

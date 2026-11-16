@@ -1141,6 +1141,10 @@ export class Service {
     const original = (await paseo.agents.ref(agentId).refresh())?.agent;
     if (!original) throw new Error("That agent is no longer available.");
     const commander = await commanderHandover(original);
+    const role = original.labels?.["wf-role"];
+    if (source === "auto" && !commander && role && !["commander", "control"].includes(role)) {
+      return { skipped: "Sessions labelled as workers or reviewers do not continue on the other provider automatically; their coordinator decides." };
+    }
     // Prompting the original again while it's still out mustn't start a second copy of the work.
     const earlier = (await listAgents(paseo, false)).agents.find(
       (agent) => agent.continuedFrom === agentId && families[agent.provider] === other,
