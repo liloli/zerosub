@@ -224,6 +224,7 @@ describe("model usage aggregation", () => {
     expect(classifyModelRole("claude", "claude-sonnet-5-5")).toBe("scout");
     expect(classifyModelRole("codex", "gpt-6-astra")).toBe("commander");
     expect(classifyModelRole("codex", "gpt-6.1-sol")).toBe("coder");
+    expect(classifyModelRole("codex", "gpt-6.2-sol")).toBe("coder");
     expect(classifyModelRole("codex", "gpt-6-luna")).toBe("scout");
     expect(classifyModelRole("opencode", "deepseek-v4.1-flash")).toBe("reviewer");
     expect(classifyModelRole("antigravity", "AGY Opus")).toBe("reviewer");

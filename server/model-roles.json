@@ -11,6 +11,7 @@
     { "platform": "claude", "match": "claude-haiku", "role": "scout" },
     { "platform": "codex", "match": "gpt-6-astra", "role": "commander" },
     { "platform": "codex", "match": "gpt-6.1-sol", "role": "coder" },
+    { "platform": "codex", "match": "gpt-6.2-sol", "role": "coder" },
     { "platform": "codex", "match": "luna", "role": "scout" },
     { "platform": "opencode", "match": "deepseek", "role": "reviewer" },
     { "platform": "antigravity", "match": "AGY Opus", "role": "reviewer" },
