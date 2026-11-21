@@ -21,24 +21,41 @@ function cause(row: SwitchRow): string | null {
       return `${row.to} is enabled again.`;
     case "default":
       return "The default account changed.";
+    case "room":
+      return `A ${FAMILY_LABEL[row.family]} subscription account has room again, so this agent leaves ${from}, a paid API.`;
+    case "pacing":
+      return `${from} is close to its 5-hour limit.`;
     default:
       return null;
   }
 }
 
-/** The work went on in a new agent on the other provider (Claude ↔ ChatGPT). */
+/** The work went on in a new agent on the other provider (Claude ↔ ChatGPT), or on OpenCode. */
 function isFork(row: SwitchRow): boolean {
-  return row.toFamily !== null && row.toFamily !== row.family;
+  return row.toProvider !== null || (row.toFamily !== null && row.toFamily !== row.family);
 }
 
 export function describeRow(row: SwitchRow): string {
-  if (isFork(row) && row.toFamily && row.continuedIn) {
+  if (isFork(row) && row.continuedIn) {
+    const title = row.continuedIn.title;
+    const detail = row.detail ? ` ${row.detail}` : "";
+    if (row.delivery === "up-to-date") {
+      return `The work is already up to date in “${title}” on ${row.to}; ZeroSub sent nothing new.${detail}`;
+    }
+    if (row.delivery === "found") {
+      return `ZeroSub found the existing OpenCode continuation “${title}” but couldn't tell what it has received. Nothing was sent; open that chat to check it against the latest instructions.${detail}`;
+    }
+    if (row.delivery === "uncertain") {
+      return `ZeroSub couldn't confirm its last handoff to “${title}”. Nothing more was sent; open that chat before retrying.${detail}`;
+    }
     const reset = formatResetIn(row.resetsAt);
     const lead =
       row.reason === "exhausted"
         ? `Every ${FAMILY_LABEL[row.family]} account is at its limit${reset ? ` (${row.from ?? "this one"} resets ${reset})` : ""}, so the work`
         : "The work";
-    return `${lead} continues on ${FAMILY_LABEL[row.toFamily]} in a new agent: “${row.continuedIn.title}” (${row.to}).`;
+    const destination = row.toProvider ? row.to : (row.toFamily ? FAMILY_LABEL[row.toFamily] : row.to);
+    // A fork to the other provider moved to an account; an OpenCode fork has none to name.
+    return `${lead} continues on ${destination} in a new agent: “${title}”${row.toProvider ? "." : ` (${row.to}).`}${detail}`;
   }
   if (row.reason === "exhausted") {
     const reset = formatResetIn(row.resetsAt);
@@ -55,17 +72,22 @@ export function describeRow(row: SwitchRow): string {
   const lead = why ? `${why} ` : "";
   switch (row.outcome) {
     case "continued":
+      if (row.continuedIn && row.detail) {
+        return `${lead}${row.detail} This task continues in “${row.continuedIn.title}” on ${row.to}.`;
+      }
       return row.continuedIn
         ? `${lead}ChatGPT conversations can't change accounts, so this task continues in “${row.continuedIn.title}” on ${row.to}.`
         : `${lead}Continuing on ${row.to}.`;
     case "stayed":
       return `${lead}This conversation stays on ${row.from ?? "its account"}.${row.detail ? ` ${row.detail}` : ""}`;
     case "pending":
-      return `${lead}Moves to ${row.to} when its session next starts.`;
+      return `${lead}Moves to ${row.to} when its session next starts.${row.detail ? ` ${row.detail}` : ""}`;
     default: {
-      const from =
-        row.from && row.reason !== "limit" && row.reason !== "signed_out" && row.reason !== "disabled" ? `from ${row.from} ` : "";
-      return `${lead}Switched ${from}to ${row.to}${row.continued ? " and carried on" : ""}.`;
+      const hidesFrom =
+        row.reason === "limit" || row.reason === "signed_out" || row.reason === "disabled" || row.reason === "room" || row.reason === "pacing";
+      const from = row.from && !hidesFrom ? `from ${row.from} ` : "";
+      const place = row.sameConversation ? " in this conversation" : "";
+      return `${lead}Switched ${from}to ${row.to}${place}${row.continued ? " and carried on" : ""}.${row.detail ? ` ${row.detail}` : ""}`;
     }
   }
 }

@@ -466,6 +466,8 @@ describe("model usage aggregation", () => {
       { locate: async () => null } as never,
       undefined,
       undefined,
+      undefined,
+      undefined,
       restarted,
     );
     const paseo = {

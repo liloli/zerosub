@@ -141,7 +141,7 @@ describe("Antigravity monitor", () => {
     const subject = monitor(vi.fn(() => mode === "reject" ? Promise.reject(new Error("Offline")) : new Promise<RunResult>(() => undefined)));
     const service = new Service({} as never, new StateStore(join(directory, "service-state.json")),
       { resolve: async () => ({}) } as unknown as FamilyResolver,
-      { locate: async () => null } as unknown as Reopener, subject);
+      { locate: async () => null } as unknown as Reopener, undefined, undefined, subject);
     const paseo = { agents: { list: async () => ({ entries: [], pageInfo: { hasMore: false, nextCursor: null } }) } } as unknown as PluginHookContext["paseo"];
     await expect(service.view(paseo, true)).resolves.toHaveProperty("antigravity");
     await expect(service.view(paseo)).resolves.toHaveProperty("accounts", []);

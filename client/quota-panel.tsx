@@ -1,6 +1,6 @@
 import type { PluginWorkspacePanelProps } from "@getpaseo/plugin/client";
 import { ScrollView, Text, View } from "react-native";
-import { formatAge, formatCredits, formatResetIn, usageSummary } from "../shared/format";
+import { formatAge, formatCredits, formatExtraUsage, formatResetIn, usageSummary } from "../shared/format";
 import type { AccountView, AntigravityView, Family } from "../shared/model";
 import { OpenCodeGoCard } from "./opencode-go-card";
 import { PlatformIcon } from "./platform-icon";
@@ -138,6 +138,7 @@ function AccountRow({
           <Text style={text.small}>{account.usage?.error ?? usageSummary(account) ?? "Checking usage…"}</Text>
         )}
         {!signedOut && credits ? <Text style={text.small}>{formatCredits(credits)}</Text> : null}
+        {!signedOut && account.usage?.extraUsage ? <Text style={text.small}>{formatExtraUsage(account.usage.extraUsage)}</Text> : null}
       </View>
     </View>
   );

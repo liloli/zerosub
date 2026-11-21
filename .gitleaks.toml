@@ -1,0 +1,14 @@
+[extend]
+useDefault = true
+
+[allowlist]
+description = "AWS's published sample access key ID and ZeroSub's synthetic gateway key in upstream tests"
+condition = "AND"
+regexTarget = "secret"
+paths = [
+  '^(client/bedrock-account|server/bedrock|server/bedrock-service|server/placement)\.test\.ts$',
+]
+regexes = [
+  '^AKIAIOSFODNN7EXAMPLE$',
+  '^sk\-test\-123456789$',
+]

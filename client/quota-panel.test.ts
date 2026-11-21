@@ -5,7 +5,7 @@ import type {
 } from "@getpaseo/plugin/client";
 import { createElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { StateView } from "../shared/model";
+import { AccountViewSchema, StateViewSchema } from "../shared/model";
 
 vi.mock("react", async () => {
   const actual = await vi.importActual<typeof import("react")>("react");
@@ -37,6 +37,7 @@ vi.mock("react-native", () => ({
 
 vi.mock("@getpaseo/plugin/client", () => ({
   useHosts: () => [],
+  useComposer: undefined,
   useSettings: () => ({ status: "loading" }),
 }));
 
@@ -49,6 +50,8 @@ vi.mock("@getpaseo/plugin/client/react-native", () => ({
 }));
 
 vi.mock("@getpaseo/plugin/client/ui", () => ({
+  Select: undefined,
+  Combobox: undefined,
   SettingsCard: hostPrimitive("SettingsCard"),
   SettingsSwitch: hostPrimitive("SettingsSwitch"),
 }));
@@ -104,7 +107,7 @@ describe("explorer quota panel", () => {
   });
 
   it("renders both quota surfaces with OpenCode Go after Antigravity, using three used windows", async () => {
-    const state: StateView = {
+    const state = StateViewSchema.parse({
       accounts: [
         {
           id: "claude-work",
@@ -160,7 +163,7 @@ describe("explorer quota panel", () => {
       browserSignIn: true,
       showComposerPill: false,
       warnings: [],
-    };
+    });
     state.opencodeGo = {
       status: "ok", refreshing: false, error: null,
       lastSuccessAt: "2026-11-01T11:55:00Z", lastAttemptAt: "2026-11-01T11:55:00Z",
@@ -258,7 +261,7 @@ describe("explorer quota panel", () => {
   });
 
   it("groups accounts by family with ChatGPT accounts first and preserves within-family order", async () => {
-    const makeAccount = (id: string, family: "claude" | "codex", label: string): StateView["accounts"][number] => ({
+    const makeAccount = (id: string, family: "claude" | "codex", label: string) => AccountViewSchema.parse({
       id,
       family,
       label,
@@ -274,7 +277,7 @@ describe("explorer quota panel", () => {
       home: null,
     });
 
-    const state: StateView = {
+    const state = StateViewSchema.parse({
       accounts: [
         makeAccount("chatgpt-alpha", "codex", "alpha-chatgpt"),
         makeAccount("claude-one", "claude", "one-claude"),
@@ -309,7 +312,7 @@ describe("explorer quota panel", () => {
       browserSignIn: true,
       showComposerPill: false,
       warnings: [],
-    };
+    });
 
     const panels: PluginWorkspacePanelContribution[] = [];
     const rpc = vi.fn().mockResolvedValue(state);

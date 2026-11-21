@@ -135,7 +135,7 @@ describe("OpenCode Go usage", () => {
     await subject.refresh();
     expect(subject.view()).toMatchObject({ status: "error", windows: [], refreshing: false });
     const service = new Service({} as never, new StateStore(join(directory, "state.json")),
-      { resolve: async () => ({}) } as never, { locate: async () => null } as never, undefined, subject);
+      { resolve: async () => ({}) } as never, { locate: async () => null } as never, undefined, undefined, undefined, subject);
     const paseo = { agents: { list: async () => ({ entries: [], pageInfo: { hasMore: false, nextCursor: null } }) } } as never;
     const state = await service.view(paseo, true);
     expect(StateViewSchema.parse(state).opencodeGo?.status).toBe("error");
@@ -148,7 +148,7 @@ describe("OpenCode Go usage", () => {
   it("does not block other account views while the usage request hangs", async () => {
     const subject = monitor(vi.fn(() => new Promise<Response>(() => undefined)));
     const service = new Service({} as never, new StateStore(join(directory, "state.json")),
-      { resolve: async () => ({}) } as never, { locate: async () => null } as never, undefined, subject);
+      { resolve: async () => ({}) } as never, { locate: async () => null } as never, undefined, undefined, undefined, subject);
     const paseo = { agents: { list: async () => ({ entries: [], pageInfo: { hasMore: false, nextCursor: null } }) } } as never;
     await expect(service.view(paseo, true)).resolves.toMatchObject({ accounts: [], opencodeGo: { refreshing: true } });
     await service.stop();

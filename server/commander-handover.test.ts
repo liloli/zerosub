@@ -81,17 +81,18 @@ describe("commander source account survives reopening", () => {
     const source = { id: "a", family: "claude", home: "/source", kind: "managed" };
     const env = vi.fn(async (home: string) => ({ CLAUDE_CONFIG_DIR: home }));
     const prepareHome = vi.fn(async () => {});
-    const subject = {
-      attach: vi.fn(), families: { resolve: async () => ({ claude: "claude" }) },
-      adapters: { claude: { portable: true, env, prepareHome } },
-      deferred: new Map(), activeAt: new Map(),
-      store: { read: async () => ({ accounts: [source], sessions: { root: { accountId: "a" } }, bindings: {}, defaults: {} }) },
-    };
+    const state = { accounts: [source], sessions: { root: { accountId: "a" } }, bindings: {}, defaults: {}, moves: {} };
+    const store = { read: async () => state, update: async (change: (draft: typeof state) => void) => change(state) };
+    const subject = new Service(
+      { claude: { portable: true, env, prepareHome } } as never,
+      store as never,
+      { resolve: async () => ({ claude: "claude" }) } as never,
+    );
     const context = { paseo: agentWith({ labels: { "wf-role": role } }) };
     const result = await (Service.prototype as any).route.call(subject, { agentId: "root", provider: "claude", reason: "refresh", purpose: "interactive", env: {} }, context);
     expect(result.env.CLAUDE_CONFIG_DIR).toBe("/source");
-    expect(env).toHaveBeenCalledWith("/source");
-    expect(prepareHome).toHaveBeenCalledWith("/source");
-    expect(subject.activeAt.has("a")).toBe(true);
+    expect(env).toHaveBeenCalledWith("/source", undefined);
+    expect(prepareHome).toHaveBeenCalledWith("/source", expect.any(Function));
+    expect((subject as any).activeAt.has("a")).toBe(true);
   });
 });

@@ -1,5 +1,6 @@
 import { Image, type ImageStyle } from "react-native";
-import type { Family } from "../shared/model";
+import { FAMILY_LABEL, type Family } from "../shared/model";
+import { Text } from "react-native";
 
 export const CHATGPT_ICON_URI =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAADiElEQVR4AZzWjXXUMBAEYIdKQiUJlQCVQCoBKiFUQqgE9vNjlLXO5zPkaW6l/Z1d6ZK8Wc7/PJbrl8LPwu/C94Lzh5L3hf9aZwhIrhj0Ygg5IwH8/pnELQKS6lix58r+sfC2cPcX70rSs/MLTAiQ/lQ+8pS4XLcI6EyUwop9rcNLIUvxbzmUVAjo+SH2ufSImFZtt+uIAOYSKArbyGVhkzgk+SBpOqRJkfT3y7Lwk7O2r+uIAMa60P1rxLJIpjAgoVuF+Nkv7ceZnl0u0xA/XK4RwJSjoOFcG124Z4XZJAaFyjyW2HGoDbtJ1HZBnFwxE1DA48GUg0ASkDIVe10ZcbcrKrl4JPnS8Yen+kCaDuq4LJ2AYEEMPbEzJEjxdEMPyClqMs6gGei65B26EJCAEkOd9ZctWQefnBFWOBMj78qYa5FTY4ho4EfZrAcfgACDQIl1R7IdYU7MV1Fjttepc/KF6HvGwqiBQJTGKrDsh8u0dIUE/ySjS6dJIKeJkvzEsP3yAQhEGfb0R4i/7nSpgL0C6ZQ02eRh58uHThOrvRNgOAPduGcy/vaIkHQmASFLpzgfUvF18ghQcKAkb+HogXab4q4Feu6Q8O4eEXCPigogO+ZRdtvR3iQycnl9UzoJdvEPCFx8NcrCwWQECTZO+zKdXhrTrVyCECEhNccEFJu7FezxxNYTSHIW4mdf5OhXAjZhOd8XPSIkP4m84D0ydGx8zsBEX1wBZ19Bj4ISCdOgD0wCMFeID/AHe2BLzJEUwz4IOASM7lxC++gV97DANBTzPsCeThPxP5LrV7AcnjOB2o+VcUsqOTIzERMbAbVR2FXlcZXq6pKXP8JPnUB+PUoimZFzch2IkGAySKmALN+ZENseEs+2xnQCijHkL1WSk2yKgg5yHSEpDhJrP8MDFU/vGuXd/D8gKaMCfeSKALsgweDMH/ibjNE699+IzsBHzCa2T4CTBBzzSOgggSFCF+jKFSEePzJ2enuFods2E+DkXowbESNDhn4P7tO/XyQ7cnMB8QjIuSksAOYJ0HUSukNEEskUo9Mxyd+1zH8d6aH7OF9gj4CE6URh03C/KYoEMpLpGuw72MWI17mmun3s9wgwGhkSgIAkgJwzOz8dZkKKIUeHrLMYOfju4hqBOEuAvSSgW2fffWQQQUi3oDgS4vmKsb+KWwSuBpZBAVAECYRIuvEmyu9w/QEAAP//O5eZFwAAAAZJREFUAwBo9Pe+jRmGfwAAAABJRU5ErkJggg==";
@@ -13,7 +14,7 @@ export const ANTIGRAVITY_ICON_URI =
 export const OPENCODE_ICON_URI =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAlElEQVR4AeyWUQqAMAxD1ZN5E/Vk6k28mSaf/SiVWdFCJPkYxNA9BtvQffz9doARYOZksxOVVh6BCbE12exEpZU3gE29uNIApQhsOAr9TTOLaKxSBOLtNCREQAREQAREQARKEeAr+cSFd8fMIhqrFIF4Ow0JEfAI7KC5JJudqLTyBjgQ48s20+xErZU3gE09WEW/XgAAAP//N164DgAAAAZJREFUAwBV0ThB0L4GBAAAAABJRU5ErkJggg==";
 
-export type PlatformType = Family | "antigravity" | "opencodeGo" | "opencode";
+export type PlatformType = Extract<Family, "codex" | "claude"> | "antigravity" | "opencodeGo" | "opencode";
 
 export interface PlatformIconInfo {
   label: string;
@@ -42,6 +43,9 @@ export function PlatformIcon({
   size?: number;
   style?: ImageStyle;
 }) {
+  if (platform === "pi" || platform === "grok" || platform === "cursor") {
+    return <Text accessibilityLabel={FAMILY_LABEL[platform]}>{FAMILY_LABEL[platform].slice(0, 1)}</Text>;
+  }
   const info: PlatformIconInfo = (PLATFORM_INFO as Record<string, PlatformIconInfo>)[platform] ?? DEFAULT_PLATFORM_INFO;
   return (
     <Image
