@@ -690,6 +690,32 @@ function noClaude(family: "claude" | "codex"): FamilyAdapter {
   return { ...absentPi(), family } as FamilyAdapter;
 }
 
+async function addReferencedPiMain(store: StateStore) {
+  await store.update((draft) => {
+    draft.accounts.push({
+      id: MAIN_ACCOUNT_ID.pi,
+      family: "pi",
+      label: "Pi placeholder",
+      autoLabel: true,
+      kind: "main",
+      auth: "subscription",
+      home: null,
+      email: null,
+      plan: null,
+      organization: null,
+      identity: null,
+      signedIn: true,
+      disabled: false,
+      limitedUntil: null,
+      limitKind: null,
+      limitedAt: null,
+      modelLimits: {},
+      createdAt: new Date().toISOString(),
+    });
+    draft.bindings["agent-pi-ref"] = { accountId: MAIN_ACCOUNT_ID.pi, source: "user", at: new Date().toISOString() };
+  });
+}
+
 describe("Pi accounts in the service", () => {
   it("adds a Pi API account with its proxy, keeps it beside its script, and routes a Pi agent on it to its own directory", async () => {
     const store = new StateStore(join(root, "state.json"));
@@ -699,7 +725,7 @@ describe("Pi accounts in the service", () => {
     service.attach(paseo as never);
     await service.start();
     try {
-      expect((await store.read()).accounts.map((account) => [account.id, account.label])).toEqual([[MAIN_ACCOUNT_ID.pi, "Pi (CLI login)"]]);
+      expect((await store.read()).accounts.map((account) => [account.id, account.label])).toEqual([]);
       await expect(service.startLogin("pi", "browser")).rejects.toThrow(/API key/);
       // With no account added, only the CLI login's address is checked, and no script is written.
       await (service as unknown as { tick(): Promise<void> }).tick();
@@ -740,8 +766,7 @@ describe("Pi accounts in the service", () => {
         moving: null,
       });
       expect(view.piLaunchers).toBe(join(root, "pi-config"));
-      // Pi's own login shows the Anthropic key it keeps, and can change it from its card.
-      expect(view.accounts.find((account) => account.id === MAIN_ACCOUNT_ID.pi)).toMatchObject({ apiEditable: true, proxyEditable: true, api: { keyHint: "" }, egress: null });
+      expect(view.accounts.find((account) => account.id === MAIN_ACCOUNT_ID.pi)).toBeUndefined();
       expect(view.warnings).toEqual(expect.not.arrayContaining([expect.stringContaining("Pi isn't installed")]));
       // Its files are still as they were: they change only when edited there.
       expect(JSON.parse(await readFile(join(main, "settings.json"), "utf8"))).toEqual({ defaultProvider: "anthropic" });
@@ -787,6 +812,7 @@ describe("Pi accounts in the service", () => {
 
   it("sets no new proxy on the CLI login while an added account without its own sends its key over plain http://", async () => {
     const store = new StateStore(join(root, "state.json"));
+    await addReferencedPiMain(store);
     const service = piService(new InstalledPi(), store);
     const paseo = { agents: { list: async () => ({ entries: [], pageInfo: { hasMore: false } }) } };
     service.attach(paseo as never);
@@ -810,6 +836,7 @@ describe("Pi accounts in the service", () => {
 
   it("sets no new proxy on the CLI login while an added account's plain-http:// gateway is kept direct only by `*` or an entry like `.com`", async () => {
     const store = new StateStore(join(root, "state.json"));
+    await addReferencedPiMain(store);
     const service = piService(new InstalledPi(), store);
     const paseo = { agents: { list: async () => ({ entries: [], pageInfo: { hasMore: false } }) } };
     service.attach(paseo as never);
@@ -836,6 +863,7 @@ describe("Pi accounts in the service", () => {
 
   it("stops giving an account's agents the CLI login's proxy once NO_PROXY no longer keeps its plain-http:// gateway direct", async () => {
     const store = new StateStore(join(root, "state.json"));
+    await addReferencedPiMain(store);
     const service = piService(new InstalledPi(), store);
     const paseo = { agents: { list: async () => ({ entries: [], pageInfo: { hasMore: false } }) } };
     service.attach(paseo as never);
@@ -861,6 +889,7 @@ describe("Pi accounts in the service", () => {
 
   it("gives an account added after the CLI login's proxy, on a plain-http:// gateway, no proxy variables, and its card says where it goes instead", async () => {
     const store = new StateStore(join(root, "state.json"));
+    await addReferencedPiMain(store);
     const service = piService(new InstalledPi(), store);
     const paseo = { agents: { list: async () => ({ entries: [], pageInfo: { hasMore: false } }) } };
     service.attach(paseo as never);
@@ -894,6 +923,7 @@ describe("Pi accounts in the service", () => {
 
   it("counts a follower's gateway on this machine as behind the CLI login's new proxy, unless NO_PROXY keeps it direct", async () => {
     const store = new StateStore(join(root, "state.json"));
+    await addReferencedPiMain(store);
     const service = piService(new InstalledPi(), store);
     const paseo = { agents: { list: async () => ({ entries: [], pageInfo: { hasMore: false } }) } };
     service.attach(paseo as never);
@@ -1146,6 +1176,7 @@ describe("Pi accounts in the service", () => {
   it("sets no new proxy on the CLI login while a follower's folder is being moved, and says to try again", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     const store = new StateStore(join(root, "state.json"));
+    await addReferencedPiMain(store);
     const pi = new InstalledPi();
     const service = piService(pi, store);
     const paseo = { agents: { list: async () => ({ entries: [], pageInfo: { hasMore: false } }) } };
@@ -1317,6 +1348,119 @@ describe("Pi accounts in the service", () => {
       expect((await store.read()).cleanup).toEqual({});
     } finally {
       await service.stop();
+    }
+  });
+
+  it("does not automatically register the main Pi account when the CLI is present", async () => {
+    const store = new StateStore(join(root, "state.json"));
+    const pi = new InstalledPi();
+    const service = piService(pi, store);
+    await service.start();
+    try {
+      const state = await store.read();
+      expect(state.accounts.find((a) => a.id === MAIN_ACCOUNT_ID.pi)).toBeUndefined();
+    } finally {
+      await service.stop();
+    }
+  });
+
+  it("cleans up an existing unreferenced main Pi placeholder on startup but preserves one referenced by default setting, session, or binding", async () => {
+    const store = new StateStore(join(root, "state.json"));
+    const pi = new InstalledPi();
+
+    // 1. Signed in and unreferenced (defaults.pi is null, no sessions or bindings) -> removed
+    await store.update((draft) => {
+      draft.accounts.push({
+        id: MAIN_ACCOUNT_ID.pi,
+        family: "pi",
+        label: "Pi placeholder",
+        autoLabel: true,
+        kind: "main",
+        auth: "subscription",
+        home: null,
+        email: null,
+        plan: null,
+        organization: null,
+        identity: null,
+        signedIn: true,
+        disabled: false,
+        limitedUntil: null,
+        limitKind: null,
+        limitedAt: null,
+        modelLimits: {},
+        createdAt: new Date().toISOString(),
+      });
+      draft.defaults.pi = null;
+    });
+    const service1 = piService(pi, store);
+    await service1.start();
+    try {
+      const state = await store.read();
+      expect(state.accounts.find((a) => a.id === MAIN_ACCOUNT_ID.pi)).toBeUndefined();
+    } finally {
+      await service1.stop();
+    }
+
+    // 2. Signed in and set as default -> preserved
+    await store.update((draft) => {
+      draft.accounts.push({
+        id: MAIN_ACCOUNT_ID.pi,
+        family: "pi",
+        label: "Pi placeholder",
+        autoLabel: true,
+        kind: "main",
+        auth: "subscription",
+        home: null,
+        email: null,
+        plan: null,
+        organization: null,
+        identity: null,
+        signedIn: true,
+        disabled: false,
+        limitedUntil: null,
+        limitKind: null,
+        limitedAt: null,
+        modelLimits: {},
+        createdAt: new Date().toISOString(),
+      });
+      draft.defaults.pi = MAIN_ACCOUNT_ID.pi;
+    });
+    const service2 = piService(pi, store);
+    await service2.start();
+    try {
+      const state = await store.read();
+      expect(state.accounts.find((a) => a.id === MAIN_ACCOUNT_ID.pi)).toBeDefined();
+      expect(state.defaults.pi).toBe(MAIN_ACCOUNT_ID.pi);
+    } finally {
+      await service2.stop();
+    }
+
+    // 3. Referenced by a binding -> preserved
+    await store.update((draft) => {
+      draft.defaults.pi = null;
+      draft.bindings["agent-bound"] = { accountId: MAIN_ACCOUNT_ID.pi, source: "user", at: new Date().toISOString() };
+    });
+    const service3 = piService(pi, store);
+    await service3.start();
+    try {
+      const state = await store.read();
+      expect(state.accounts.find((a) => a.id === MAIN_ACCOUNT_ID.pi)).toBeDefined();
+    } finally {
+      await service3.stop();
+    }
+
+    // 4. Referenced by a session -> preserved
+    await store.update((draft) => {
+      delete draft.bindings["agent-bound"];
+      draft.sessions["agent-session"] = { accountId: MAIN_ACCOUNT_ID.pi, family: "pi", openedAt: new Date().toISOString() };
+    });
+    const service4 = piService(pi, store);
+    await service4.start();
+    try {
+      const state = await store.read();
+      expect(state.accounts.find((a) => a.id === MAIN_ACCOUNT_ID.pi)).toBeDefined();
+    } finally {
+      await service4.stop();
     }
   });
 });

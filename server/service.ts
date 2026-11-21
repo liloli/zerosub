@@ -687,6 +687,7 @@ export class Service {
     this.starting ??= (async () => {
       // The last readings show right away; fresh ones replace them as they arrive.
       for (const [accountId, reading] of await loadReadings()) if (!this.usage.has(accountId)) this.usage.set(accountId, reading);
+      await this.cleanPiMainPlaceholder();
       await Promise.all(FAMILIES.map((family) => this.ensureFamily(family)));
       this.started = true;
       await this.reportStrayHomes().catch(() => undefined);
@@ -694,6 +695,26 @@ export class Service {
       this.starting = null;
     });
     return this.starting;
+  }
+
+  /** Cleans up an existing main Pi placeholder unless an active session, binding, or default setting references it. */
+  private async cleanPiMainPlaceholder(): Promise<void> {
+    let deleted = false;
+    await this.store.update((draft) => {
+      const main = findAccount(draft, MAIN_ACCOUNT_ID.pi);
+      if (main && main.kind === "main") {
+        const referenced =
+          draft.defaults.pi === MAIN_ACCOUNT_ID.pi ||
+          Object.values(draft.sessions).some((s) => s.accountId === MAIN_ACCOUNT_ID.pi) ||
+          Object.values(draft.bindings).some((b) => b.accountId === MAIN_ACCOUNT_ID.pi);
+        if (!referenced) {
+          draft.accounts = draft.accounts.filter((a) => a.id !== MAIN_ACCOUNT_ID.pi);
+          dropNextPick(draft, main);
+          deleted = true;
+        }
+      }
+    });
+    if (deleted) this.forgetReading(MAIN_ACCOUNT_ID.pi);
   }
 
   async stop(): Promise<void> {
@@ -721,6 +742,7 @@ export class Service {
     await this.store.update((draft) => {
       let main = findAccount(draft, MAIN_ACCOUNT_ID[family]);
       if (!main) {
+        if (family === "pi") return;
         main = newAccount({ id: MAIN_ACCOUNT_ID[family], family, kind: "main", home: null });
         main.signedIn = false;
         // Kept until a sign-in names it: Pi's never does.
