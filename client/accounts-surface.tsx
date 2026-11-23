@@ -784,7 +784,7 @@ function AccountCard({
             busy={busy === "toggle"}
             onPress={() => void toggle()}
           />
-        ) : resets ? (
+        ) : resets && !account.ceilingHit ? (
           <Button
             theme={theme}
             size="small"
