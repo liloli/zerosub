@@ -173,6 +173,20 @@ describe("explorer quota panel", () => {
         { id: "monthly", label: "Monthly", usedPercent: 49, resetsAt: "2026-11-08T12:00:00Z" },
       ],
     };
+    const agyMain = AccountViewSchema.parse({
+      ...state.accounts[0],
+      id: "antigravity-main", family: "antigravity", kind: "main", label: "Antigravity CLI login",
+      usage: { ...state.accounts[0]!.usage, windows: [
+        { id: "agy-cli-weekly", label: "Weekly · CLI quotas", usedPercent: 20, resetsAt: null },
+      ] },
+    });
+    const agyManaged = AccountViewSchema.parse({
+      ...agyMain, id: "antigravity-isolated", kind: "managed", label: "Isolated AGY",
+      usage: { ...agyMain.usage, windows: [
+        { id: "agy-isolated-weekly", label: "Weekly · Isolated quotas", usedPercent: 31, resetsAt: null },
+      ] },
+    });
+    state.accounts.push(agyMain, agyManaged);
 
     const panels: PluginWorkspacePanelContribution[] = [];
     const rpc = vi.fn().mockResolvedValue(state);
@@ -231,6 +245,8 @@ describe("explorer quota panel", () => {
     expect(output).toContain("28%    11-03 20:00    2d");
     expect(output).toContain("Antigravity");
     expect(output).toContain("Gemini Pro");
+    expect(output).not.toContain("Antigravity CLI login");
+    expect(output).toContain("Isolated AGY");
     expect(output).toContain("80%    11-02 00:00    4h");
     expect(output.indexOf("OpenCode Go")).toBeGreaterThan(output.indexOf("Antigravity"));
     expect(output).toContain("100%    22:00    2h");
@@ -245,6 +261,10 @@ describe("explorer quota panel", () => {
     const accountsProps = { ...props, store } as unknown as Parameters<typeof AccountsSurface>[0];
     const accountsOutput = renderText(createElement(AccountsSurface, accountsProps));
     expect(accountsOutput.indexOf("OpenCode Go")).toBeGreaterThan(accountsOutput.indexOf("Antigravity"));
+    expect(accountsOutput).toContain("AntigravityAdd");
+    expect(accountsOutput).toContain("Gemini Pro");
+    expect(accountsOutput).not.toContain("Weekly · CLI quotas");
+    expect(accountsOutput).toContain("Weekly · Isolated quotas");
     expect(accountsOutput).toContain("51%    11-08 20:00    7d");
     state.opencodeGo = { ...state.opencodeGo, status: "error", error: "OpenCode Go usage failed (HTTP 401)." };
     await store.refresh();
@@ -255,6 +275,9 @@ describe("explorer quota panel", () => {
     delete state.opencodeGo;
     await store.refresh();
     expect(renderText(createElement(AccountsSurface, accountsProps))).not.toContain("OpenCode Go");
+    state.antigravity = { ...state.antigravity!, status: "unavailable" };
+    await store.refresh();
+    expect(renderText(createElement(AccountsSurface, accountsProps))).toContain("Weekly · CLI quotas");
     store.stop();
 
     cleanup();

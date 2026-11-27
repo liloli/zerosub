@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
-import { mkdir, readFile } from "node:fs/promises";
+import { mkdir, readFile, rm } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join, resolve } from "node:path";
 import { z } from "zod";
 import { AntigravityGroupSchema, type AntigravityView, type UsageWindow } from "../shared/model";
 import { ProgressEmitter, spawnEnv, type EnvPatch, type FamilyAdapter, type Identity, type LoginHandle, type RedeemReply, type UsageRead } from "./adapter";
@@ -215,8 +215,10 @@ export class AntigravityAdapter implements FamilyAdapter {
     return new AntigravityLogin(command, spawnEnv(await this.env(home), this.family));
   }
 
-  // Removing a managed home deletes its file-backed login with it.
-  async logout(): Promise<void> {}
+  async logout(home: string): Promise<void> {
+    if (!isAbsolute(home) || resolve(home) === resolve(homedir())) return;
+    await rm(join(home, ".gemini", "antigravity-cli", "antigravity-oauth-token"), { force: true });
+  }
 
   async redeemReset(): Promise<RedeemReply> {
     return { outcome: "none", message: "Antigravity has no banked resets in ZeroSub.", left: null };

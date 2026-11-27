@@ -58,6 +58,8 @@ export function AccountsSurface(props: PluginSurfaceProps & { store: ZeroSubStor
   // An optional provider (Pi, Grok, Cursor) shows once its CLI login is registered (its CLI is there,
   // and for Grok and Cursor a Paseo provider runs it) or an account of it was added.
   const families = shownFamilies(state?.accounts ?? []);
+  const antigravity = state?.antigravity?.status !== "unavailable" ? state?.antigravity : undefined;
+  const hasAntigravityMain = state?.accounts.some((account) => account.family === "antigravity" && account.kind === "main");
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.surface0 }}>
       <ScrollView
@@ -142,13 +144,16 @@ export function AccountsSurface(props: PluginSurfaceProps & { store: ZeroSubStor
                 theme={theme}
                 compact={layout.compact}
                 store={store}
+                antigravityUsage={family === "antigravity" ? antigravity : undefined}
                 onAdd={() => setAdding({ family })}
                 onSignIn={(account) => setAdding({ family, accountId: account.id })}
               />
             ))
           : null}
 
-        {state?.antigravity ? <AntigravityCard theme={theme} usage={state.antigravity} /> : null}
+        {antigravity && !hasAntigravityMain ? (
+          <Card theme={theme}><AntigravityUsage theme={theme} usage={antigravity} title="Antigravity" /></Card>
+        ) : null}
         {state?.opencodeGo ? <OpenCodeGoCard theme={theme} usage={state.opencodeGo} /> : null}
 
         <AutomationSettings theme={theme} compact={layout.compact} />
@@ -245,6 +250,7 @@ function FamilySection({
   theme,
   compact,
   store,
+  antigravityUsage,
   onAdd,
   onSignIn,
 }: {
@@ -254,6 +260,7 @@ function FamilySection({
   theme: Theme;
   compact: boolean;
   store: ZeroSubStore;
+  antigravityUsage?: AntigravityView;
   onAdd(): void;
   onSignIn(account: AccountView): void;
 }) {
@@ -312,6 +319,7 @@ function FamilySection({
               store={store}
               paidFallback={state.paidApiFallback ?? false}
               compact={compact}
+              antigravityUsage={account.kind === "main" ? antigravityUsage : undefined}
               onSignIn={() => onSignIn(account)}
             />
           ))}
@@ -339,6 +347,7 @@ function AccountCard({
   store,
   paidFallback,
   compact,
+  antigravityUsage,
   onSignIn,
 }: {
   account: AccountView;
@@ -348,6 +357,7 @@ function AccountCard({
   paidFallback: boolean;
   /** A phone-sized screen: the header's buttons get a row of their own, so the name keeps its room. */
   compact: boolean;
+  antigravityUsage?: AntigravityView;
   onSignIn(): void;
 }) {
   const text = useText(theme);
@@ -385,7 +395,7 @@ function AccountCard({
   // A signed-out account reports only that as its status, but may be disabled too.
   const disabled = isDisabled(account);
   const faded = disabled ? { opacity: 0.55 } : null;
-  const windows = account.usage?.windows ?? [];
+  const windows = antigravityUsage ? [] : account.usage?.windows ?? [];
   const agents = account.agentCount === 0 ? "No agents" : `${account.agentCount} agent${account.agentCount === 1 ? "" : "s"}`;
   const freshness = !signedOut && account.usage && windows.length > 0 ? `updated ${formatAge(account.usage.fetchedAt)}` : null;
 
@@ -693,7 +703,9 @@ function AccountCard({
       ) : null}
 
       <View style={[{ gap: 10 }, faded]}>
-        {signedOut ? (
+        {antigravityUsage ? (
+          <AntigravityUsage theme={theme} usage={antigravityUsage} />
+        ) : signedOut ? (
           <Text style={text.small}>
             {bedrock
               ? `AWS refused it${account.apiError ? `: ${account.apiError}` : "."} Fix its credentials, region or models to use this account.`
@@ -1004,14 +1016,13 @@ function Avatar({ theme, label }: { theme: Theme; label: string }) {
   );
 }
 
-function AntigravityCard({ theme, usage }: { theme: Theme; usage: AntigravityView }) {
+function AntigravityUsage({ theme, usage, title }: { theme: Theme; usage: AntigravityView; title?: string }) {
   const text = useText(theme);
-  if (usage.status === "unavailable") return null;
   const stale = usage.status === "stale" || usage.status === "error";
   return (
-    <Card theme={theme}>
+    <>
       <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "baseline", justifyContent: "space-between", gap: 6 }}>
-        <Text style={text.heading} accessibilityRole="header">Antigravity</Text>
+        {title ? <Text style={text.heading} accessibilityRole="header">{title}</Text> : null}
         <Text style={text.small}>
           {usage.lastSuccessAt ? formatAge(usage.lastSuccessAt) : "Not loaded yet"}
           {usage.refreshing ? " · Refreshing…" : ""}
@@ -1030,7 +1041,7 @@ function AntigravityCard({ theme, usage }: { theme: Theme; usage: AntigravityVie
           ? `${usage.lastSuccessAt ? `Showing data from ${formatAge(usage.lastSuccessAt)}. ` : ""}Last refresh failed: ${usage.error}`
           : usage.lastSuccessAt ? `Showing data from ${formatAge(usage.lastSuccessAt)}.` : "Not loaded yet"}
       </Text> : null}
-    </Card>
+    </>
   );
 }
 

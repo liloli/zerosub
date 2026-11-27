@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -198,6 +198,34 @@ describe("Antigravity accounts", () => {
     expect(await adapter.env("/isolated")).toMatchObject({
       HOME: "/isolated", SSH_CONNECTION: "paseo", GEMINI_API_KEY: "", GOOGLE_APPLICATION_CREDENTIALS: "",
     });
+  });
+
+  it("clears only the isolated sign-in file when logging out", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "zerosub-agy-logout-"));
+    const hostHome = join(directory, "host");
+    const managedHome = join(directory, "managed");
+    vi.stubEnv("HOME", hostHome);
+    try {
+      const hostConfig = join(hostHome, ".gemini", "antigravity-cli");
+      const managedConfig = join(managedHome, ".gemini", "antigravity-cli");
+      const tokenFile = "antigravity-oauth-token";
+      await mkdir(hostConfig, { recursive: true });
+      await mkdir(managedConfig, { recursive: true });
+      await writeFile(join(hostConfig, tokenFile), "host fixture");
+      await writeFile(join(managedConfig, tokenFile), "managed fixture");
+      await writeFile(join(managedConfig, "settings.json"), "{}");
+
+      const adapter = new AntigravityAdapter();
+      await adapter.logout(managedHome);
+      await adapter.logout(managedHome);
+      await adapter.logout(hostHome);
+      await expect(readFile(join(managedConfig, tokenFile))).rejects.toMatchObject({ code: "ENOENT" });
+      await expect(readFile(join(hostConfig, tokenFile), "utf8")).resolves.toBe("host fixture");
+      await expect(readFile(join(managedConfig, "settings.json"), "utf8")).resolves.toBe("{}");
+    } finally {
+      vi.unstubAllEnvs();
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 
   it.skipIf(process.platform !== "linux")("passes the pasted code to the official login process", async () => {

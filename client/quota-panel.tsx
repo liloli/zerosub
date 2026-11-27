@@ -35,7 +35,9 @@ export function QuotaPanel(props: PluginWorkspacePanelProps & { store: ZeroSubSt
   const text = useText(theme);
   const antigravity =
     state?.antigravity && state.antigravity.status !== "unavailable" ? state.antigravity : null;
-  const accounts = state ? groupAccountsByFamily(state.accounts) : [];
+  const accounts = state ? groupAccountsByFamily(state.accounts.filter(
+    (account) => !(antigravity && account.family === "antigravity" && account.kind === "main"),
+  )) : [];
   const opencodeGo = state?.opencodeGo?.status !== "unavailable" ? state?.opencodeGo : null;
 
   return (
