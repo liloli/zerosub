@@ -2,9 +2,9 @@ import { z } from "zod";
 
 /**
  * The provider families this plugin manages: the subscription CLIs (Claude Code, Codex, Grok Build,
- * Cursor), and Pi, whose added accounts are Anthropic API keys. Custom provider profiles map onto one of them.
+ * Cursor, Antigravity), and Pi, whose added accounts are Anthropic API keys. Custom provider profiles map onto one of them.
  */
-export const FamilySchema = z.enum(["claude", "codex", "pi", "grok", "cursor"]);
+export const FamilySchema = z.enum(["claude", "codex", "pi", "grok", "cursor", "antigravity"]);
 export type Family = z.infer<typeof FamilySchema>;
 export const FAMILIES: readonly Family[] = FamilySchema.options;
 
@@ -14,6 +14,7 @@ export const FAMILY_LABEL: Record<Family, string> = {
   pi: "Pi",
   grok: "Grok",
   cursor: "Cursor",
+  antigravity: "Antigravity",
 };
 
 /** Paseo's OpenCode harness provider. It runs on the host itself, so a fork to it uses no account. */
@@ -22,16 +23,16 @@ export const OPENCODE_LABEL = "OpenCode";
 /**
  * The provider a stopped chat can carry on with when every account of its own is out (Claude ↔
  * ChatGPT); null for Pi, whose added accounts are billed per use and never take work over by themselves,
- * and for Grok and Cursor, whose chats don't fork to another provider.
+ * and for Grok, Cursor and Antigravity, whose chats don't fork to another provider.
  */
-export const OTHER_FAMILY: Record<Family, Family | null> = { claude: "codex", codex: "claude", pi: null, grok: null, cursor: null };
+export const OTHER_FAMILY: Record<Family, Family | null> = { claude: "codex", codex: "claude", pi: null, grok: null, cursor: null, antigravity: null };
 
 /**
  * Families not every Paseo user runs: one shows once its CLI login is registered (its CLI is there,
  * and for Grok and Cursor a Paseo provider runs it) or an account of it was added, and its CLI is only
  * missed once an account of it was added.
  */
-export const OPTIONAL: Record<Family, boolean> = { claude: false, codex: false, pi: true, grok: true, cursor: true };
+export const OPTIONAL: Record<Family, boolean> = { claude: false, codex: false, pi: true, grok: true, cursor: true, antigravity: true };
 
 /** The families the Accounts screen shows, given the accounts there are (the CLI logins registered included). */
 export function shownFamilies(accounts: readonly { family: Family }[]): Family[] {
@@ -40,10 +41,10 @@ export function shownFamilies(accounts: readonly { family: Family }[]): Family[]
 
 /**
  * For a provider whose conversations can't change accounts in place: one with history carries on in a
- * new agent on the account picked for it (Codex's). False for Grok's and Cursor's, which stay on their
+ * new agent on the account picked for it (Codex's). False for Grok, Cursor and Antigravity, which stay on their
  * account until moving them is known to work; only new agents follow a pick or the default.
  */
-export const HAND_OFF: Record<Family, boolean> = { claude: true, codex: true, pi: true, grok: false, cursor: false };
+export const HAND_OFF: Record<Family, boolean> = { claude: true, codex: true, pi: true, grok: false, cursor: false, antigravity: false };
 
 /** Stands for a proxy's password (or a user name with none) wherever the proxy is shown. */
 export const HIDDEN = "•••";
@@ -394,6 +395,7 @@ export type PaceView = z.infer<typeof PaceViewSchema>;
 export const AccountViewSchema = z.object({
   ceilingHit: z.boolean().optional(),
   quotaCeilings: z.record(z.string(), z.number().int().min(1).max(99)).optional(),
+  codexFastUntil: z.iso.date().optional(),
   id: z.string(),
   family: FamilySchema,
   label: z.string(),
@@ -490,6 +492,11 @@ export const AgentRouteSchema = z.object({
    * continues the work in a new agent instead.
    */
   movable: z.boolean(),
+  /**
+   * The agent is pinned to `accountId` with `allowLimited` (see `zerosub.agents.account`), so a
+   * provider limit there doesn't move it. Absent from servers that don't support the option.
+   */
+  allowLimited: z.boolean().optional(),
   /** The agent started on this account because its weekly reset was near, and is still on it. */
   selectionReason: z.literal("weekly_reset").optional(),
   /**
@@ -544,6 +551,15 @@ export type LoginView = z.infer<typeof LoginViewSchema>;
  * (`paseo.agents.create({ metadata })`). Routing reads it once, when the agent is created.
  */
 export const ACCOUNT_METADATA_KEY = "zerosub.account";
+
+/** Agent metadata marking a Fast speed ZeroSub set, so only that speed is undone again. */
+export const CODEX_FAST_METADATA_KEY = "zerosub.codex-fast";
+
+/**
+ * Metadata on a hand-off's create naming the account it's bound to, for ZeroSub's own `agent.create`
+ * hook (which has no agent ID to look the binding up by). The hook removes it again.
+ */
+export const HANDOFF_ACCOUNT_METADATA_KEY = "zerosub.handoff-account";
 
 /**
  * Agent metadata holding the agent's own ID. Paseo doesn't tell a composer item which agent's
@@ -653,6 +669,8 @@ export const ModelUsageViewSchema = AntigravityViewSchema.omit({ groups: true })
 export type ModelUsageView = z.infer<typeof ModelUsageViewSchema>;
 
 export const StateViewSchema = z.object({
+  /** ZeroSub 1.30.0 and earlier omit the version but use the same v1 shape. */
+  version: z.literal(1).default(1),
   antigravity: AntigravityViewSchema.optional(),
   opencodeGo: OpenCodeGoViewSchema.optional(),
   modelUsage: ModelUsageViewSchema.optional(),

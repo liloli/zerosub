@@ -1,7 +1,7 @@
-import { AntigravityMonitor } from "./server/antigravity";
 import { ModelUsageMonitor } from "./server/model-usage";
 import { OpenCodeGoMonitor } from "./server/opencode-go";
 import type { PluginServerContext, PluginSettingsState } from "@getpaseo/plugin/server";
+import { AntigravityAdapter, AntigravityMonitor } from "./server/antigravity";
 import { ClaudeAdapter } from "./server/claude";
 import { CodexAdapter } from "./server/codex";
 import { CursorAdapter } from "./server/cursor";
@@ -19,8 +19,10 @@ import {
   redeemReset,
   removeAccount,
   renameAccount,
+  setCodexFastUntil,
   setQuotaCeiling,
   setAgentAccount,
+  moveBeforeLimit,
   setDefaultAccount,
   setNextAgentAccount,
   setAccountEnabled,
@@ -41,7 +43,7 @@ import {
 
 export default function contribute(server: PluginServerContext) {
   const service = new Service(
-    { claude: new ClaudeAdapter(), codex: new CodexAdapter(), pi: new PiAdapter(), grok: new GrokAdapter(), cursor: new CursorAdapter() },
+    { claude: new ClaudeAdapter(), codex: new CodexAdapter(), pi: new PiAdapter(), grok: new GrokAdapter(), cursor: new CursorAdapter(), antigravity: new AntigravityAdapter() },
     undefined,
     undefined,
     undefined,
@@ -84,13 +86,13 @@ export default function contribute(server: PluginServerContext) {
     }
   });
 
-  // A new Claude agent's mode is carried to its first session, where Paseo can't say it yet. Creating
-  // the agent never fails for this: on any error the request goes on unchanged.
+  // Set the speed for an eligible new Codex agent or carry a Claude agent's mode to its first session.
+  // On error the request goes on unchanged.
   server.before("agent.create", async ({ request }, context) => {
     try {
       return await service.onAgentCreate(request, context);
     } catch (error) {
-      console.error("[ZeroSub] could not note a new agent's mode", describe(error));
+      console.error("[ZeroSub] could not prepare a new agent's options", describe(error));
       return undefined;
     }
   });
@@ -106,8 +108,8 @@ export default function contribute(server: PluginServerContext) {
     });
   });
   // A new agent is in the next state the app reads, so its composer has its account at once.
-  server.on("agent.created", () => {
-    service.onAgentCreated();
+  server.on("agent.created", (_event, context) => {
+    service.onAgentCreated(context);
   });
   server.on("agent.archived", (event) => {
     void service.onAgentArchived(event.agent.id).catch(() => undefined);
@@ -131,6 +133,10 @@ export default function contribute(server: PluginServerContext) {
     await service.setQuotaCeiling(accountId, windowId, percent);
     return { ok: true as const };
   });
+  server.handle(setCodexFastUntil, async ({ accountId, until }, { paseo }) => {
+    await service.setCodexFastUntil(paseo, accountId, until);
+    return { ok: true as const };
+  });
   server.handle(renameAccount, async ({ accountId, label }) => {
     await service.rename(accountId, label);
     return { ok: true as const };
@@ -146,7 +152,10 @@ export default function contribute(server: PluginServerContext) {
     return { ok: true as const };
   });
   server.handle(redeemReset, ({ accountId, agentId }, { paseo }) => service.redeem(paseo, accountId, agentId));
-  server.handle(setAgentAccount, ({ agentId, accountId }, { paseo }) => service.setAgentAccount(paseo, agentId, accountId));
+  server.handle(setAgentAccount, ({ agentId, accountId, allowLimited }, { paseo }) =>
+    service.setAgentAccount(paseo, agentId, accountId, { allowLimited: allowLimited === true }),
+  );
+  server.handle(moveBeforeLimit, ({ agentId, accountId, stopBackgroundWork }, { paseo }) => service.moveBeforeLimit(paseo, agentId, accountId, { stopBackgroundWork }));
   server.handle(forkAgent, ({ agentId, destination }, { paseo }) => service.forkAgent(paseo, agentId, destination));
   server.handle(setAccountEnabled, ({ accountId, enabled }, { paseo }) => service.setAccountEnabled(paseo, accountId, enabled));
   server.handle(addApiAccount, async (input) => ({ accountId: await service.addApiAccount(input) }));

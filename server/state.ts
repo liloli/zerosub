@@ -50,6 +50,8 @@ export const StoredAccountSchema = z.object({
    */
   modelLimits: z.record(z.string(), z.object({ until: z.string(), at: z.string(), source: z.enum(["turn", "reading"]) })).default({}),
   quotaCeilings: z.record(z.string(), z.number().int().min(1).max(99)).optional(),
+  /** Last UTC calendar day on which ZeroSub may enable Fast on this ChatGPT login. */
+  codexFastUntil: z.iso.date().optional(),
   createdAt: z.string(),
 });
 export type StoredAccount = z.infer<typeof StoredAccountSchema>;
@@ -71,6 +73,12 @@ export const BindingSchema = z.object({
    * key no longer counts as a stand-in (see `chooseAccount` and `Service.leavesPaid`).
    */
   standIn: z.literal(true).optional(),
+  /**
+   * Keep the agent on this account even while it's at its limit (it runs on the account's extra
+   * usage, say): routing doesn't swap it, and a limit doesn't move it or carry it on elsewhere. Only
+   * set by `zerosub.agents.account` with `allowLimited`; signed-out and disabled accounts still swap.
+   */
+  allowLimited: z.literal(true).optional(),
 });
 export type Binding = z.infer<typeof BindingSchema>;
 
@@ -229,6 +237,7 @@ export const StoredStateSchema = z.object({
       // Families added later than Pi may be absent (none chosen), so registries and fixtures written before them load as they are.
       grok: z.string().nullable().optional(),
       cursor: z.string().nullable().optional(),
+      antigravity: z.string().nullable().optional(),
     })
     .default({ claude: null, codex: null, pi: null }),
   /** Per-agent overrides of the default account. */
@@ -251,6 +260,7 @@ export const StoredStateSchema = z.object({
       pi: NextAgentPickSchema.nullable().default(null),
       grok: NextAgentPickSchema.nullable().optional(),
       cursor: NextAgentPickSchema.nullable().optional(),
+      antigravity: NextAgentPickSchema.nullable().optional(),
     })
     .default({ claude: null, codex: null, pi: null }),
   /** Where added Pi accounts' homes are kept: `dir` (null: `~/.pi-config`), and folders picked before whose accounts still move to it. */
@@ -262,7 +272,7 @@ export const StoredStateSchema = z.object({
 });
 export type StoredState = z.infer<typeof StoredStateSchema>;
 
-export const MAIN_ACCOUNT_ID: Record<Family, string> = { claude: "claude-main", codex: "codex-main", pi: "pi-main", grok: "grok-main", cursor: "cursor-main" };
+export const MAIN_ACCOUNT_ID: Record<Family, string> = { claude: "claude-main", codex: "codex-main", pi: "pi-main", grok: "grok-main", cursor: "cursor-main", antigravity: "antigravity-main" };
 
 export function emptyState(): StoredState {
   return StoredStateSchema.parse({});
